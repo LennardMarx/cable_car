@@ -135,6 +135,32 @@ void Skyline::addBuilding(const std::vector<Vec2> &_corners, double _cx,
   seedTips(buildings.back());
 }
 
+// nodes of the upper towers (layer >= _minLayer) for the cables to hang from;
+// some are growing branch tips, which carry their cables into the canopy.
+// only original nodes: they exist from the start and move with the growth
+std::vector<int> Skyline::pickAnchors(int _count, int _minLayer) {
+  std::vector<int> walls, tips;
+  for (const Building &b : buildings) {
+    if (b.layer < _minLayer)
+      continue;
+    for (int i : b.ring) {
+      const GrowthNode &node = nodes[i];
+      if (node.born != 0 || node.pos.y < growthStart - 20 ||
+          node.pos.y > halfHeight || std::abs(node.pos.x) > halfWidth)
+        continue;
+      (node.tip ? tips : walls).push_back(i);
+    }
+  }
+  std::shuffle(walls.begin(), walls.end(), rng);
+  std::shuffle(tips.begin(), tips.end(), rng);
+  std::vector<int> result;
+  int fromTips = std::min<int>(tips.size(), 0.3 * _count);
+  result.insert(result.end(), tips.begin(), tips.begin() + fromTips);
+  int fromWalls = std::min<int>(walls.size(), _count - fromTips);
+  result.insert(result.end(), walls.begin(), walls.begin() + fromWalls);
+  return result;
+}
+
 // where a horizontal line at height _y crosses the outline: edge point and x,
 // sorted by x (pairs of crossings enclose the floor)
 std::vector<std::pair<EdgePoint, double>>
@@ -228,6 +254,8 @@ void Skyline::drawWindows(UI &_ui, int _layer) {
       if ((p[1] - p[0]).length() > 2.5 * windowWidth ||
           (p[3] - p[0]).length() > 2.5 * windowHeight)
         continue;
+      for (Vec2 &q : p)
+        q *= worldScale;
       std::vector<Vec2> &quads = w.lit ? lit : holes;
       quads.insert(quads.end(), p, p + 4);
     }
@@ -535,7 +563,7 @@ void Skyline::draw(UI &_ui, bool _debug) {
       for (const Vec2 &o : offsets) {
         points.clear();
         for (int i : b.ring)
-          points.push_back(nodes[i].pos + o);
+          points.push_back(nodes[i].pos * worldScale + o);
         _ui.scanPolygon(points, [&](int _row, float _x0, float _x1) {
           _ui.drawSpan(_row, _x0, _x1);
         });
@@ -549,10 +577,10 @@ void Skyline::draw(UI &_ui, bool _debug) {
   for (const Building &b : buildings) {
     for (int i : b.ring) {
       _ui.setAlpha(60 + 195 * growthMask(b, nodes[i].pos));
-      _ui.fillCircle(nodes[i].pos, 1.2 / _ui.scale);
+      _ui.fillCircle(nodes[i].pos * worldScale, 1.2 / _ui.scale);
     }
     _ui.setAlpha(255);
     for (const GrowthTip &tip : b.tips)
-      _ui.drawCircle(nodes[tip.node].pos, 5 / _ui.scale);
+      _ui.drawCircle(nodes[tip.node].pos * worldScale, 5 / _ui.scale);
   }
 }

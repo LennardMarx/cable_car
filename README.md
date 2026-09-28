@@ -1,7 +1,7 @@
 # Chasm City Cable Car
 
 ## Overview
-A 2D take on the cable cars of Alastair Reynolds' *Chasm City*. Vines hang from a canopy of corrupted buildings, some free, some draped between two points, some knotted into other vines. A pod with four telescopic arms climbs through them: the arms reach for the vines with their hooks, carry the pod, and let go again to move along the canopy. A controller keeps the pod stable while it moves to the position given by the mouse or the arrow keys.
+A 2D take on the cable cars of Alastair Reynolds' *Chasm City*. A futuristic city grows into a canopy of dead, tree-like buildings; vines hang from the buildings, some free, some draped between two points, some knotted into other vines. A pod with four telescopic arms climbs through them: the arms reach for the vines with their hooks, carry the pod, and let go again to move along the canopy. A controller keeps the pod stable while it moves to the position given by the mouse or the arrow keys.
 
 ## Installation
 Dependencies: a C++17 compiler and [SDL3](https://github.com/libsdl-org/SDL) (for the web build [emsdk](https://emscripten.org), which ships an SDL3 port).
@@ -37,7 +37,7 @@ Space - pause
 Q / Esc - quit
 
 ## Skyline growth demo
-A standalone demo (`bin/growth_demo`, `growth_demo.html`) for the background: futuristic skyscrapers whose tops morph into tree-like crowns, drawn in the same translucent style as the canopy. It will later be merged into the game, with the cables hanging from the crowns.
+A standalone demo (`bin/growth_demo`, `growth_demo.html`) for the background: futuristic skyscrapers whose tops morph into tree-like crowns, drawn in the same translucent style as the canopy. The same skyline is the background of the game (drawn at 0.15 of its size), with the cables hanging from it.
 
 Controls: Space - pause, R - restart, G - new skyline, Up/Down - growth speed, D - show nodes (brightness = growth mask), P - screenshot, Q / Esc - quit
 
@@ -54,7 +54,7 @@ Nodes are never removed, only inserted, so a node index is a stable attachment p
 ## Details
 
 ### Vines
-The vines are chains of particles simulated with position based dynamics (30 substeps per frame, distance constraints between neighbours, a soft bending constraint over two segments). Anchors on the canopy are particles with infinite mass. The canopy itself is a randomly grown branching structure, its nodes are the anchor points.
+The vines are chains of particles simulated with position based dynamics (30 substeps per frame, distance constraints between neighbours, a soft bending constraint over two segments). They hang from 40 random nodes of the middle and near buildings (some of them growing branch tips), which are particles with infinite mass. While the city grows, the anchors follow their nodes (interpolated over the substeps), and cables between two anchors that move apart pay out rope instead of tearing. The cables settle without bending at the start, so no loops get locked in.
 
 ### Pod and arms
 The pod is a rigid body (position, orientation) with 40 kg. Each arm consists of two links which telescope together; inverse kinematics (law of cosines, like the double pendulum robot arm) places the elbow away from the pod, the telescope keeps the elbow at a comfortable bend. Every arm can apply a limited force between its shoulder and the hook; the reaction force acts on the vine, so the pod's weight pulls the vines down. When an arm is stretched to its limit a stiff mechanical stop engages.

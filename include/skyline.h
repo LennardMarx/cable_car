@@ -19,8 +19,8 @@ struct GrowthNode {
 
 // point on an edge of the original outline (moves with the deformation)
 struct EdgePoint {
-  int a, b;  // node indices
-  double t;  // position between them
+  int a, b; // node indices
+  double t; // position between them
 };
 
 // window corner: between a left and a right wall point of its floor
@@ -64,6 +64,11 @@ public:
   void generate(unsigned, double, double);
   void step(); // one differential growth step
   bool getSettled() const { return settled; }
+
+  // skyline meters -> world units (the game draws the city smaller)
+  void setWorldScale(double _scale) { worldScale = _scale; }
+  Vec2 nodePosition(int _node) const { return nodes[_node].pos * worldScale; }
+  std::vector<int> pickAnchors(int, int);
   void draw(UI &, bool);
 
   const std::vector<GrowthNode> &getNodes() const { return nodes; }
@@ -107,6 +112,7 @@ private:
   std::vector<Vec2> before; // node positions before the step
 
   std::mt19937 rng;
+  double worldScale = 1;
   bool settled = false; // growth finished and at rest
   int growthSteps = 0;  // steps since the growth started
   double halfWidth = 200, halfHeight = 133;
@@ -149,11 +155,11 @@ private:
   const double settleMove = 0.005;   // below this max move: settled
   const double hardenTime = 1.5;     // s until grown wood stops moving
   // windows (in the original building, they follow the deformation)
-  const double floorPitch = 5;       // m between window rows
+  const double floorPitch = 5; // m between window rows
   const double windowWidth = 2.2, windowHeight = 2.6;
-  const double windowPitch = 4;      // m between window columns
-  const double wallMargin = 2;       // m from the walls
-  const double litShare = 0.08;      // share of lit windows
+  const double windowPitch = 4; // m between window columns
+  const double wallMargin = 2;  // m from the walls
+  const double litShare = 0.08; // share of lit windows
 };
 
 #endif

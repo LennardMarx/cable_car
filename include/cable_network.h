@@ -33,6 +33,8 @@ struct Cable {
   CableType type;
   double segment; // rest length between particles
   double shade;   // [0, 1] for drawing variation
+  int firstLink;  // its links and bends are stored consecutively
+  int firstBend;
 };
 
 // point along a cable: u = segment index + fraction inside the segment
@@ -42,22 +44,21 @@ struct CablePoint {
   bool valid() const { return cable >= 0; }
 };
 
-// part of the canopy structure (only drawn, cables hang from its nodes)
-struct Beam {
-  Vec2 a;
-  Vec2 b;
-  double width; // pixels
-};
-
-// vines hanging from the canopy, simulated with position based dynamics
+// vines hanging from the buildings, simulated with position based dynamics
+// the anchors are kinematic and follow the growing city
 class CableNetwork {
 public:
   CableNetwork();
   ~CableNetwork();
 
-  void generate(unsigned, double, double);
+  void generate(unsigned, double, double, const std::vector<Vec2> &);
   void clearForces();
   void substep(double);
+
+  // anchors move from their current to new positions over the substeps
+  void setAnchorTargets(const std::vector<Vec2> &);
+  void moveAnchors(double); // 0 ... 1 of the way
+  void payOut();            // lengthen cables pulled taut by their anchors
 
   Vec2 getPoint(const CablePoint &) const;
   Vec2 getVelocity(const CablePoint &) const;
@@ -76,9 +77,7 @@ public:
 
 private:
   int addParticle(const Vec2 &, double);
-  void addAnchor(const Vec2 &);
   void addCable(int, int, double, CableType);
-  void growCanopy(const Vec2 &, double, double, int, double);
   void settle(double);
   void solveLink(const Link &, double);
   int randomAnchor();
@@ -91,19 +90,21 @@ private:
   std::vector<Link> links;
   std::vector<Link> bends; // soft links over two segments (bending)
   std::vector<Cable> cables;
-  std::vector<Beam> beams;
-  std::vector<int> anchors; // particles on the canopy cables can hang from
+  std::vector<int> anchors; // particles on the buildings cables hang from
+  std::vector<Vec2> anchorFrom, anchorTo;
 
   std::mt19937 rng;
   double halfWidth = 30, halfHeight = 20; // visible world extents
   double time = 0;
   bool windOn = true;
+  bool bendOn = true;
 
   const Vec2 gravity{0, -9.81};
   const double damping = 0.05;       // velocity damping [1/s]
   const int iterations = 2;          // constraint iterations per substep
   const double bendStiffness = 0.05; // [0, 1] per iteration
   const double windStrength = 0.6;   // m/s^2
+  const double taut = 0.97;          // chord / length that pays out rope
 };
 
 #endif
