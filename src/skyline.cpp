@@ -155,19 +155,24 @@ void Skyline::seedTips(Building &_b) {
   auto addTip = [&](int _k, const Vec2 &_heading, double _budget) {
     _b.tips.push_back({_b.ring[_k], _heading.normalized(), _budget, 0});
   };
-  // roof: spread evenly over the width
+  // roof: spread evenly over the width, fanning out to both sides
+  // (the ring runs right to left over the roof)
   int count = std::clamp((int)std::round(_b.height / 60), 2, 4);
   for (int t = 0; t < count && !roof.empty(); ++t) {
     int k = roof[(t * 2 + 1) * roof.size() / (2 * count)];
-    Vec2 heading = growthDir(_b, nodes[_b.ring[k]].pos).rotated(uniform(-0.3, 0.3));
-    addTip(k, heading, uniform(minLimb, maxLimb));
+    double f = (t + 0.5) / count; // 0 right ... 1 left
+    double angle = roofFan * (2 * f - 1) + uniform(-0.15, 0.15);
+    addTip(k, Vec2(0, 1).rotated(angle), uniform(minLimb, maxLimb));
   }
-  // facades: shorter limbs, reaching out and up
+  // facades: reaching out and up, longer the higher they start (broccoli)
+  double bottom = std::max(growthStart, _b.base);
   for (auto *side : {&left, &right}) {
     for (int t = 0; t < facadeTips && !side->empty(); ++t) {
       int k = (*side)[std::uniform_int_distribution<int>(0, side->size() - 1)(rng)];
-      Vec2 heading = (outwardNormal(_b, k) + Vec2(0, 1.2)).rotated(uniform(-0.2, 0.2));
-      addTip(k, heading, 0.5 * uniform(minLimb, maxLimb));
+      Vec2 p = nodes[_b.ring[k]].pos;
+      double up = std::clamp((p.y - bottom) / (top - bottom), 0.0, 1.0);
+      Vec2 heading = (outwardNormal(_b, k) + Vec2(0, 0.7)).rotated(uniform(-0.2, 0.2));
+      addTip(k, heading, (0.25 + 0.75 * up) * uniform(minLimb, maxLimb));
     }
   }
 }
@@ -180,8 +185,8 @@ double Skyline::growthMask(const Building &, const Vec2 &_p) const {
 
 // preferred growth direction: up in the middle, up and out at the sides
 Vec2 Skyline::growthDir(const Building &_b, const Vec2 &_p) const {
-  double side = std::clamp((_p.x - _b.cx) / 20, -1.0, 1.0);
-  return Vec2(0.8 * side, 1).normalized();
+  double side = std::clamp((_p.x - _b.cx) / 15, -1.0, 1.0);
+  return Vec2(spread * side, 1).normalized();
 }
 
 Vec2 Skyline::outwardNormal(const Building &_b, int _k) const {
@@ -229,7 +234,7 @@ void Skyline::step() {
   buildHash();
   moves.assign(nodes.size(), {0, 0});
   // roughness follows the growth burst, the outline calms down afterwards
-  double rough = jitter * growthBoost() / burst;
+  double rough = jitter * std::max(roughFloor, growthBoost() / burst);
   int hardenSteps = hardenTime * stepsPerSecond;
   std::vector<char> isTip(nodes.size(), 0);
   for (const Building &b : buildings)

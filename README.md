@@ -41,7 +41,7 @@ A standalone demo (`bin/growth_demo`, `growth_demo.html`) for the background: fu
 
 Controls: Space - pause, R - restart, G - new skyline, Up/Down - growth speed, D - show nodes (brightness = growth mask), P - screenshot, Q / Esc - quit
 
-Every building is a closed outline of nodes (counter clockwise). Below half the screen height the city stays unchanged, above it the outline grows into dead trees:
+Every building is a closed outline of nodes (counter clockwise). Below the growth start (a bit under half the screen height) the city stays unchanged, above it the outline grows into wide, broccoli-like dead trees:
 - branches are growth tips which keep extending along their heading and drag the outline with them into a limb; straight pieces with sudden kinks, bending slowly up and outwards
 - main branches start on the roof and on the facades, side branches split off only occasionally (about one per 15 m, at most two levels deep, at most 10 growing tips per tower), so limbs continue growing rather than splitting
 - springs keep the edges near their rest length, repulsion (spatial hash) keeps the outlines apart, a little random jitter makes them rugged during the growth burst

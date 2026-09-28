@@ -96,19 +96,22 @@ private:
   const double kSmooth = 0.02;  // low: rugged outlines
   const double kRepel = 0.5;
   const double jitter = 0.16;   // random roughness per step [m]
+  const double roughFloor = 0.5; // share of the jitter after the burst
   const double taper = 0.6;     // finer detail at branch ends
   const double crownDepth = 70; // m above the tower to full taper
   const double maxStep = 0.4;
-  const double growthStart = 0; // world height where the growth begins
+  const double growthStart = -30; // world height where the growth begins
   const double growthRamp = 30; // m above it to full growth
   // branches (dead trees: long limbs, few side branches, sharp kinks)
   const double tipSpeed = 0.06; // m per step at growth boost 1
   const double maxTipStep = 0.5;
-  const double minLimb = 35, maxLimb = 70;   // length of main branches [m]
+  const double minLimb = 45, maxLimb = 85;   // length of main branches [m]
   const int facadeTips = 3;                  // branches per facade side
+  const double roofFan = 0.8;   // angle spread of the roof branches [rad]
+  const double spread = 1.8;    // sideways pull of the branches (width)
   const double branchLength = 15;            // m grown per side branch
-  const double kinkLength = 6;               // m grown per kink
-  const double minKink = 0.2, maxKink = 0.6; // kink angle [rad]
+  const double kinkLength = 4;               // m grown per kink
+  const double minKink = 0.3, maxKink = 0.8; // kink angle [rad]
   const double tropism = 0.01; // bending towards the growth direction
   const int maxDepth = 2;      // branching recursion
   const int maxTips = 10;      // growing tips per building
