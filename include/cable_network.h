@@ -73,7 +73,7 @@ public:
   void draw(UI &);
 
   static inline const double segmentLength = 0.5; // m
-  static inline const double linearDensity = 2.0; // kg/m
+  static inline const double linearDensity = 4.0; // kg/m
 
 private:
   int addParticle(const Vec2 &, double);
@@ -100,7 +100,8 @@ private:
   bool bendOn = true;
 
   const Vec2 gravity{0, -9.81};
-  const double damping = 0.05;       // velocity damping [1/s]
+  const double damping = 0.25;       // velocity damping [1/s]
+  const int hangingCount = 28;       // free hanging vines
   const int iterations = 2;          // constraint iterations per substep
   const double bendStiffness = 0.05; // [0, 1] per iteration
   const double windStrength = 0.6;   // m/s^2

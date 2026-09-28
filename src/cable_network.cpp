@@ -41,7 +41,7 @@ void CableNetwork::generate(unsigned _seed, double _halfWidth,
     return;
 
   // free hanging vines
-  for (int i = 0; i < 16; ++i) {
+  for (int i = 0; i < hangingCount; ++i) {
     int a = randomAnchor();
     double maxLength = particles[a].pos.y + halfHeight - 3;
     if (maxLength < 4)
