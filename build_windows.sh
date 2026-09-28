@@ -4,11 +4,13 @@
 # Builds two targets:
 #   1. Native WSL binary        -> bin/cable_car          (run with WSLg)
 #   2. WebAssembly (Emscripten) -> cable_car.js/.wasm     (for the website)
+#   3. Skyline growth demo      -> bin/growth_demo, growth_demo.js/.wasm
 #
 # Usage, from a WSL/Ubuntu terminal in this directory:
 #   ./build_windows.sh           # build both
 #   ./build_windows.sh native    # native binary only
 #   ./build_windows.sh wasm      # emscripten build only
+#   ./build_windows.sh demo      # growth demo (native + wasm)
 #
 # SDL3 is not packaged for Ubuntu 24.04, build it once into a local prefix:
 #   git clone --depth 1 --branch release-3.2.24 https://github.com/libsdl-org/SDL.git
@@ -47,11 +49,27 @@ build_wasm() {
   echo ">> Done. Serve from the website root and open projects/cable_car/cable_car.html"
 }
 
+# skyline growth demo, shares UI and skyline with the game
+DEMO_SOURCES="demo/growth_demo.cpp src/UI.cpp src/skyline.cpp"
+
+build_demo() {
+  echo ">> Building growth demo -> bin/growth_demo, growth_demo.js/.wasm"
+  mkdir -p bin
+  g++ $DEMO_SOURCES -std=c++17 -Iinclude/ -I"$SDL3_DIR/include"     -L"$SDL3_DIR/lib" -Wl,-rpath,"$SDL3_DIR/lib" -lSDL3 -O2 -Wall     -o bin/growth_demo
+  if [ -f "$EMSDK_ENV" ]; then
+    # shellcheck disable=SC1090
+    source "$EMSDK_ENV" >/dev/null 2>&1
+    emcc $DEMO_SOURCES -std=c++17 -Iinclude/ -s WASM=1 -s USE_SDL=3 -O3       -o growth_demo.js
+  fi
+  echo ">> Done. Run it with: ./bin/growth_demo"
+}
+
 case "${1:-all}" in
   native) build_native ;;
   wasm)   build_wasm ;;
-  all)    build_native; build_wasm ;;
-  *) echo "Usage: $0 [native|wasm|all]" >&2; exit 1 ;;
+  demo)   build_demo ;;
+  all)    build_native; build_wasm; build_demo ;;
+  *) echo "Usage: $0 [native|wasm|demo|all]" >&2; exit 1 ;;
 esac
 
 echo ">> Build complete."

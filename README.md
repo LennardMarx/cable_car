@@ -36,6 +36,20 @@ P - screenshot (native)
 Space - pause
 Q / Esc - quit
 
+## Skyline growth demo
+A standalone demo (`bin/growth_demo`, `growth_demo.html`) for the background: futuristic skyscrapers whose tops morph into tree-like crowns, drawn in the same translucent style as the canopy. It will later be merged into the game, with the cables hanging from the crowns.
+
+Controls: Space - pause, R - restart, G - new skyline, Up/Down - growth speed, D - show nodes (brightness = growth mask), P - screenshot, Q / Esc - quit
+
+Every building is a closed outline of nodes (counter clockwise). Differential growth moves them each step:
+- springs keep the edges at their rest length, smoothing pulls a node to the midpoint of its neighbours
+- repulsion (spatial hash) keeps all nodes of a layer apart, so outlines never cross
+- new nodes are inserted mostly at growing tips: convex parts of the outline facing up in the middle and up-and-out at the sides, so bumps become branches instead of coral-like folds
+- a growth mask is 0 on the lower 60 % of the tower (unchanged skyscraper) and rises to 1 towards the top
+- growth slows down and stops at 2.5 times the initial node count, the simulation stops once everything is at rest
+
+Nodes are never removed, only inserted, so a node index is a stable attachment point that moves with the growth.
+
 ## Details
 
 ### Vines

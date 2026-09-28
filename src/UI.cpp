@@ -1,4 +1,5 @@
 #include "../include/UI.h"
+#include <algorithm>
 
 UI::UI(int sizeX, int sizeY, double _scale)
     : sizeX(sizeX), sizeY(sizeY), scale(_scale) {
@@ -109,6 +110,42 @@ void UI::fillPolygon(const std::vector<Vec2> &_points) {
   }
   SDL_RenderGeometry(renderer, nullptr, vertices.data(), vertices.size(),
                      indices.data(), indices.size());
+}
+
+// scanline fill: crossings of every edge with the pixel row centers,
+// spans between pairs of crossings (even-odd rule)
+void UI::scanPolygon(const std::vector<Vec2> &_points,
+                     const std::function<void(int, float, float)> &_span) {
+  if (_points.size() < 3)
+    return;
+  rowCrossings.resize(sizeY);
+  int minRow = sizeY, maxRow = -1;
+  for (size_t k = 0; k < _points.size(); ++k) {
+    SDL_FPoint a = toScreen(_points[k]);
+    SDL_FPoint b = toScreen(_points[(k + 1) % _points.size()]);
+    if (a.y == b.y)
+      continue;
+    float y0 = std::min(a.y, b.y), y1 = std::max(a.y, b.y);
+    int r0 = std::max(0, (int)std::ceil(y0 - 0.5f));
+    int r1 = std::min(sizeY - 1, (int)std::ceil(y1 - 0.5f) - 1);
+    for (int r = r0; r <= r1; ++r) {
+      float yc = r + 0.5f;
+      rowCrossings[r].push_back(a.x + (yc - a.y) * (b.x - a.x) / (b.y - a.y));
+    }
+    minRow = std::min(minRow, r0);
+    maxRow = std::max(maxRow, r1);
+  }
+  for (int r = minRow; r <= maxRow; ++r) {
+    std::vector<float> &xs = rowCrossings[r];
+    std::sort(xs.begin(), xs.end());
+    for (size_t k = 0; k + 1 < xs.size(); k += 2)
+      _span(r, xs[k], xs[k + 1]);
+    xs.clear();
+  }
+}
+
+void UI::drawSpan(int _row, float _x0, float _x1) {
+  SDL_RenderLine(renderer, _x0, _row + 0.5f, _x1, _row + 0.5f);
 }
 
 // draw trajectory (intensity dependend on recency)

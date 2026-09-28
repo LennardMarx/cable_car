@@ -5,6 +5,7 @@
 #include "vec2.h"
 #include <SDL3/SDL.h>
 #include <cstdint>
+#include <functional>
 #include <vector>
 
 // window and drawing helpers
@@ -31,6 +32,10 @@ public:
   void drawCircle(const Vec2 &, double);                   // radius in meters
   void fillCircle(const Vec2 &, double);                   // radius in meters
   void fillPolygon(const std::vector<Vec2> &);             // convex polygon
+  // any closed polygon (even-odd), calls back with the pixel spans per row
+  void scanPolygon(const std::vector<Vec2> &,
+                   const std::function<void(int, float, float)> &);
+  void drawSpan(int, float, float);
   void drawTrajectory(std::vector<Vec2> &, int);
 
   bool saveScreenshot(const char *);
@@ -46,6 +51,7 @@ private:
   SDL_Window *window = nullptr;     // create window pointer
   SDL_Renderer *renderer = nullptr; // create renderer pointer
   SDL_Color drawColor = {249, 245, 215, 255};
+  std::vector<std::vector<float>> rowCrossings; // reused by scanPolygon
 };
 
 #endif
