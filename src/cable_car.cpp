@@ -296,7 +296,9 @@ static bool solve3(const double _m[3][3], const double _b[3], double _y[3]) {
 
 // controller: desired force and torque on the pod, distributed onto the
 // grasping arms (weighted least norm, forces along the arms are cheaper)
-void CableCar::distributeForces() {
+// when the arms are too weak, the orientation keeps priority
+// _stopTorque: torque of the mechanical stops, compensated by the leveling
+void CableCar::distributeForces(double _stopTorque) {
   std::vector<int> active;
   for (int i = 0; i < 4; ++i) {
     arms[i].force = {0, 0};
@@ -305,13 +307,6 @@ void CableCar::distributeForces() {
   }
   if (!controllerState || active.empty())
     return;
-
-  // PD on the reference + gravity and drag compensation
-  Vec2 force = (ref - pos) * (mass * kp) + (refVel - vel) * (mass * kd) -
-               gravity * mass + vel * linearDrag;
-  double angle = std::remainder(theta, 2 * M_PI);
-  double torque = inertia * (-kTheta * angle - kOmega * omega);
-  double b[3] = {force.x, force.y, torque};
 
   // wrench of arm i: A_i * F_i with A_i = [1 0; 0 1; -r.y r.x]
   // weights W_i^-1 = u u^T + side * n n^T (u: along the arm)
@@ -346,18 +341,63 @@ void CableCar::distributeForces() {
   m[2][0] = m[0][2];
   m[2][1] = m[1][2];
 
-  double y[3];
-  if (!solve3(m, b, y))
-    return;
+  // arm forces F_i = W_i A_i^T (A W A^T)^-1 b for a desired wrench b
+  auto armForces = [&](const Vec2 &_force, double _torque) {
+    std::vector<Vec2> forces(active.size());
+    double b[3] = {_force.x, _force.y, _torque};
+    double y[3];
+    if (!solve3(m, b, y))
+      return forces;
+    for (size_t k = 0; k < active.size(); ++k) {
+      const Block &bl = blocks[k];
+      double ax = y[0] - bl.r.y * y[2];
+      double ay = y[1] + bl.r.x * y[2];
+      forces[k] = {bl.w11 * ax + bl.w12 * ay, bl.w12 * ax + bl.w22 * ay};
+    }
+    return forces;
+  };
 
-  // F_i = W_i A_i^T y, limited by the motor strength
-  for (size_t k = 0; k < active.size(); ++k) {
-    const Block &bl = blocks[k];
-    double ax = y[0] - bl.r.y * y[2];
-    double ay = y[1] + bl.r.x * y[2];
-    Vec2 f(bl.w11 * ax + bl.w12 * ay, bl.w12 * ax + bl.w22 * ay);
-    arms[active[k]].force = f.clampedLength(maxArmForce);
+  // three parts of the wrench, in order of priority:
+  // keeping level > carrying the weight (+ drag) > moving to the reference
+  double angle = std::remainder(theta, 2 * M_PI);
+  std::vector<Vec2> level =
+      armForces({0, 0}, inertia * (-kTheta * angle - kOmega * omega) -
+                              _stopTorque);
+  std::vector<Vec2> carry = armForces(-gravity * mass + vel * linearDrag, 0);
+  std::vector<Vec2> move = armForces(
+      (ref - pos) * (mass * kp) + (refVel - vel) * (mass * kd), 0);
+
+  // largest share s of a lower priority part that the arms can still add
+  auto combine = [&](double _sCarry, double _sMove, size_t _k) {
+    return level[_k] + carry[_k] * _sCarry + move[_k] * _sMove;
+  };
+  auto feasible = [&](double _sCarry, double _sMove) {
+    for (size_t k = 0; k < active.size(); ++k)
+      if (combine(_sCarry, _sMove, k).length() > maxArmForce)
+        return false;
+    return true;
+  };
+  auto largestShare = [&](auto _fits) {
+    if (_fits(1.0))
+      return 1.0;
+    double lo = 0, hi = 1;
+    for (int it = 0; it < 12; ++it) {
+      double mid = (lo + hi) / 2;
+      (_fits(mid) ? lo : hi) = mid;
+    }
+    return lo;
+  };
+  double sCarry = 1, sMove = 1;
+  if (!feasible(1, 1)) {
+    sMove = largestShare([&](double _s) { return feasible(1, _s); });
+    if (sMove == 0)
+      sCarry = largestShare([&](double _s) { return feasible(_s, 0); });
   }
+
+  // leveling alone may still exceed the motor strength -> clip
+  for (size_t k = 0; k < active.size(); ++k)
+    arms[active[k]].force =
+        combine(sCarry, sMove, k).clampedLength(maxArmForce);
 }
 
 // one substep of the pod dynamics, arm forces react on the cables
@@ -367,7 +407,29 @@ void CableCar::step(CableNetwork &_net, double _h) {
     if (arm.state == ArmState::GRASPING)
       arm.hook = _net.getPoint(arm.grip);
 
-  distributeForces();
+  // mechanical stop: the arm cannot stretch beyond its reach
+  double stopTorque = 0;
+  for (int i = 0; i < 4; ++i) {
+    Arm &arm = arms[i];
+    arm.stop = {0, 0};
+    if (arm.state != ArmState::GRASPING)
+      continue;
+    Vec2 s = shoulder(i);
+    Vec2 r = s - pos;
+    Vec2 d = arm.hook - s;
+    double dist = d.length();
+    if (dist > softReach) {
+      Vec2 u = d / dist;
+      Vec2 relVel = _net.getVelocity(arm.grip) - (vel + r.perp() * omega);
+      double stop =
+          stopStiffness * (dist - softReach) + stopDamping * relVel.dot(u);
+      if (stop > 0)
+        arm.stop = u * stop;
+    }
+    stopTorque += r.cross(arm.stop);
+  }
+
+  distributeForces(stopTorque);
 
   Vec2 totalForce = gravity * mass - vel * linearDrag;
   double totalTorque = -omega * angularDrag;
@@ -376,23 +438,9 @@ void CableCar::step(CableNetwork &_net, double _h) {
     Arm &arm = arms[i];
     if (arm.state != ArmState::GRASPING)
       continue;
-    Vec2 s = shoulder(i);
-    Vec2 r = s - pos;
-    Vec2 d = arm.hook - s;
-    double dist = d.length();
-
-    // mechanical stop: the arm cannot stretch beyond its reach
-    if (dist > softReach) {
-      Vec2 u = d / dist;
-      Vec2 relVel = _net.getVelocity(arm.grip) - (vel + r.perp() * omega);
-      double stop =
-          stopStiffness * (dist - softReach) + stopDamping * relVel.dot(u);
-      if (stop > 0)
-        arm.force += u * stop;
-    }
-
+    arm.force += arm.stop;
     totalForce += arm.force;
-    totalTorque += r.cross(arm.force);
+    totalTorque += (shoulder(i) - pos).cross(arm.force);
     _net.applyForce(arm.grip, -arm.force); // actio = reactio
   }
 

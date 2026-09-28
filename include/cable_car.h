@@ -40,7 +40,7 @@ private:
   void climb(int, const CableNetwork &, double);
   void swapGrip(const CableNetwork &);
   void moveHook(Arm &, const Vec2 &, double, const Vec2 &);
-  void distributeForces();
+  void distributeForces(double);
 
   std::array<Arm, 4> arms;
 
@@ -70,7 +70,7 @@ private:
 
   // controller (per unit mass / inertia)
   const double kp = 9, kd = 6;               // position
-  const double kTheta = 50, kOmega = 14;     // orientation
+  const double kTheta = 120, kOmega = 22;    // orientation
   const double maxSpeed = 5.0;               // reference speed [m/s]
   const double maxAccel = 5.0;               // reference acceleration
   const double maxLag = 2.0;                 // max distance reference-pod

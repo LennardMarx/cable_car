@@ -30,6 +30,7 @@ public:
   double extension = 1; // telescope factor of both links
   double cooldown = 0;  // time until the arm may change its grip again
   Vec2 force;           // force the arm applies on the pod
+  Vec2 stop;            // part of it from the mechanical stop
 
   static inline const double linkBase = 1.4; // link length at extension 1
   static inline const double minExtension = 0.6;
