@@ -41,12 +41,12 @@ A standalone demo (`bin/growth_demo`, `growth_demo.html`) for the background: fu
 
 Controls: Space - pause, R - restart, G - new skyline, Up/Down - growth speed, D - show nodes (brightness = growth mask), P - screenshot, Q / Esc - quit
 
-Every building is a closed outline of nodes (counter clockwise). Differential growth moves them each step:
-- springs keep the edges at their rest length, smoothing pulls a node to the midpoint of its neighbours
-- repulsion (spatial hash) keeps all nodes of a layer apart, so outlines never cross
-- new nodes are inserted mostly at growing tips: convex parts of the outline facing up in the middle and up-and-out at the sides, so bumps become branches instead of coral-like folds
-- a growth mask is 0 on the lower 60 % of the tower (unchanged skyscraper) and rises to 1 towards the top
-- growth slows down and stops at 2.5 times the initial node count, the simulation stops once everything is at rest
+Every building is a closed outline of nodes (counter clockwise). Below half the screen height the city stays unchanged, above it the outline grows into dead trees:
+- branches are growth tips which keep extending along their heading and drag the outline with them into a limb; straight pieces with sudden kinks, bending slowly up and outwards
+- main branches start on the roof and on the facades, side branches split off only occasionally (about one per 15 m, at most two levels deep, at most 10 growing tips per tower), so limbs continue growing rather than splitting
+- springs keep the edges near their rest length, repulsion (spatial hash) keeps the outlines apart, a little random jitter makes them rugged during the growth burst
+- detail gets finer towards the branch ends, so they taper into points
+- growth bursts right after the start and eases off; grown wood hardens after 1.5 s and stops moving, the simulation stops once all tips are done
 
 Nodes are never removed, only inserted, so a node index is a stable attachment point that moves with the growth.
 
