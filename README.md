@@ -26,9 +26,9 @@ Run with:
 Mouse - desired pod position
 Arrow keys - move the desired position
 C - toggle controller (pod hangs passively from its grips)
-F - toggle path finding (off: straight towards the target)
+F - toggle path finding (default off: straight towards the target)
 W - toggle wind
-T - toggle the trail drawn by the pod
+T - toggle the trail drawn by the pod (default off)
 D - debug view (reach, preferred grips, arm forces, reference, supported area)
 R - respawn the pod
 G - grow new vines

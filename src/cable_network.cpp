@@ -275,14 +275,14 @@ void CableNetwork::applyForce(const CablePoint &_cp, const Vec2 &_f) {
 }
 
 void CableNetwork::draw(UI &_ui) {
-  // cables
+  // cables, between the translucent city and the solid pod
   for (const Cable &c : cables) {
-    _ui.setAlpha(150 + 90 * c.shade);
-    double width = c.type == CableType::DRAPED ? 3 : 2;
+    _ui.setAlpha(95 + 45 * c.shade);
+    double width = c.type == CableType::DRAPED ? 2.5 : 2;
     for (size_t i = 1; i < c.ids.size(); ++i)
       _ui.drawThickLine(particles[c.ids[i - 1]].pos, particles[c.ids[i]].pos,
                         width);
     // mount on the building
-    _ui.fillCircle(particles[c.ids[0]].pos, 3 / _ui.scale);
+    _ui.fillCircle(particles[c.ids[0]].pos, 2.5 / _ui.scale);
   }
 }

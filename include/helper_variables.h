@@ -38,10 +38,10 @@ private:
   static inline bool reset = false;
   static inline bool regenerate = false;
   static inline bool pause = false;
-  static inline bool trajOn = true;
+  static inline bool trajOn = false;
   static inline bool debug = false;
   static inline bool screenshot = false;
-  static inline bool pathOn = true; // path finding instead of direct line
+  static inline bool pathOn = false; // path finding instead of direct line
   static inline std::vector<Vec2> trajectory;
 };
 
