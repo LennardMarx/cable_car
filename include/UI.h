@@ -36,6 +36,7 @@ public:
   void scanPolygon(const std::vector<Vec2> &,
                    const std::function<void(int, float, float)> &);
   void drawSpan(int, float, float);
+  void fillQuads(const std::vector<Vec2> &); // 4 corners per quad, one batch
   void drawTrajectory(std::vector<Vec2> &, int);
 
   bool saveScreenshot(const char *);

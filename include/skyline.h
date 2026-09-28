@@ -12,8 +12,26 @@ struct GrowthNode {
   Vec2 pos;
   int building;
   int layer;
-  double rest; // rest length of its edges, fixed when created
-  int born;    // growth step it was created in (hardens later)
+  double rest;      // rest length of its edges, fixed when created
+  int born;         // growth step it was created in (hardens later)
+  bool tip = false; // a branch grew out of it (dragged far away)
+};
+
+// point on an edge of the original outline (moves with the deformation)
+struct EdgePoint {
+  int a, b;  // node indices
+  double t;  // position between them
+};
+
+// window corner: between a left and a right wall point of its floor
+struct WindowCorner {
+  EdgePoint left, right;
+  double u; // 0 at the left wall, 1 at the right wall
+};
+
+struct Window {
+  WindowCorner corners[4]; // bottom left, bottom right, top right, top left
+  bool lit;
 };
 
 // growing end of a branch, drags the outline along its heading
@@ -32,7 +50,8 @@ struct Building {
   double height;         // original height
   int maxNodes;          // safety limit for the growth
   std::vector<GrowthTip> tips;
-  int layer;             // 0 far, 1 middle, 2 near
+  std::vector<Window> windows;
+  int layer; // 0 far, 1 middle, 2 near
 };
 
 // skyscrapers whose tops morph into organic, tree-like crowns
@@ -64,6 +83,11 @@ private:
   void moveTips(Building &, double);
   void updateTips(Building &);
   void branch(Building &, const GrowthTip &);
+  void addWindows(Building &);
+  std::vector<std::pair<EdgePoint, double>> crossings(const Building &,
+                                                      double) const;
+  Vec2 cornerPos(const WindowCorner &) const;
+  void drawWindows(UI &, int);
   void buildHash();
   int hashCell(const Vec2 &) const;
   void split();
@@ -80,7 +104,7 @@ private:
   int hashCols = 0, hashRows = 0;
 
   std::vector<int> ringPos; // position of every node in its ring
-  std::vector<Vec2> before;  // node positions before the step
+  std::vector<Vec2> before; // node positions before the step
 
   std::mt19937 rng;
   bool settled = false; // growth finished and at rest
@@ -93,24 +117,24 @@ private:
                                          // stay above the rest length)
   const double repelRadius = 2.2 * edge; // distance kept between nodes
   const double kSpring = 0.3;
-  const double kSmooth = 0.02;  // low: rugged outlines
+  const double kSmooth = 0.02; // low: rugged outlines
   const double kRepel = 0.5;
-  const double jitter = 0.16;   // random roughness per step [m]
-  const double roughFloor = 0.5; // share of the jitter after the burst
-  const double taper = 0.6;     // finer detail at branch ends
-  const double crownDepth = 70; // m above the tower to full taper
+  const double jitter = 0.16;    // random roughness per step [m]
+  const double roughFloor = 0.7; // share of the jitter after the burst
+  const double taper = 0.6;      // finer detail at branch ends
+  const double crownDepth = 70;  // m above the tower to full taper
   const double maxStep = 0.4;
   const double growthStart = -30; // world height where the growth begins
-  const double growthRamp = 30; // m above it to full growth
+  const double growthRamp = 30;   // m above it to full growth
   // branches (dead trees: long limbs, few side branches, sharp kinks)
   const double tipSpeed = 0.06; // m per step at growth boost 1
   const double maxTipStep = 0.5;
-  const double minLimb = 45, maxLimb = 85;   // length of main branches [m]
-  const int facadeTips = 3;                  // branches per facade side
-  const double roofFan = 0.8;   // angle spread of the roof branches [rad]
-  const double spread = 1.8;    // sideways pull of the branches (width)
-  const double branchLength = 15;            // m grown per side branch
-  const double kinkLength = 4;               // m grown per kink
+  const double minLimb = 45, maxLimb = 85; // length of main branches [m]
+  const int facadeTips = 3;                // branches per facade side
+  const double roofFan = 0.8;     // angle spread of the roof branches [rad]
+  const double spread = 1.8;      // sideways pull of the branches (width)
+  const double branchLength = 15; // m grown per side branch
+  const double kinkLength = 4;    // m grown per kink
   const double minKink = 0.3, maxKink = 0.8; // kink angle [rad]
   const double tropism = 0.01; // bending towards the growth direction
   const int maxDepth = 2;      // branching recursion
@@ -124,6 +148,12 @@ private:
   const double maxGrowth = 3.5;      // node limit / initial nodes
   const double settleMove = 0.005;   // below this max move: settled
   const double hardenTime = 1.5;     // s until grown wood stops moving
+  // windows (in the original building, they follow the deformation)
+  const double floorPitch = 5;       // m between window rows
+  const double windowWidth = 2.2, windowHeight = 2.6;
+  const double windowPitch = 4;      // m between window columns
+  const double wallMargin = 2;       // m from the walls
+  const double litShare = 0.08;      // share of lit windows
 };
 
 #endif

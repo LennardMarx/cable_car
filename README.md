@@ -46,6 +46,7 @@ Every building is a closed outline of nodes (counter clockwise). Below the growt
 - main branches start on the roof and on the facades, side branches split off only occasionally (about one per 15 m, at most two levels deep, at most 10 growing tips per tower), so limbs continue growing rather than splitting
 - springs keep the edges near their rest length, repulsion (spatial hash) keeps the outlines apart, a little random jitter makes them rugged during the growth burst
 - detail gets finer towards the branch ends, so they taper into points
+- windows are laid out in the original towers; each corner remembers the wall points to its left and right on its floor, so the windows bend and skew with the walls; windows torn apart by a branch or stretched too far disappear
 - growth bursts right after the start and eases off; grown wood hardens after 1.5 s and stops moving, the simulation stops once all tips are done
 
 Nodes are never removed, only inserted, so a node index is a stable attachment point that moves with the growth.

@@ -131,7 +131,111 @@ void Skyline::addBuilding(const std::vector<Vec2> &_corners, double _cx,
   ringPos.resize(nodes.size());
   for (size_t k = 0; k < b.ring.size(); ++k)
     ringPos[b.ring[k]] = k;
+  addWindows(buildings.back());
   seedTips(buildings.back());
+}
+
+// where a horizontal line at height _y crosses the outline: edge point and x,
+// sorted by x (pairs of crossings enclose the floor)
+std::vector<std::pair<EdgePoint, double>>
+Skyline::crossings(const Building &_b, double _y) const {
+  std::vector<std::pair<EdgePoint, double>> result;
+  int n = _b.ring.size();
+  for (int k = 0; k < n; ++k) {
+    int a = _b.ring[k], c = _b.ring[(k + 1) % n];
+    Vec2 pa = nodes[a].pos, pc = nodes[c].pos;
+    if ((pa.y <= _y) == (pc.y <= _y))
+      continue;
+    double t = (_y - pa.y) / (pc.y - pa.y);
+    result.push_back({{a, c, t}, pa.x + t * (pc.x - pa.x)});
+  }
+  std::sort(result.begin(), result.end(),
+            [](const auto &_l, const auto &_r) { return _l.second < _r.second; });
+  return result;
+}
+
+// grid of windows in the original tower, every corner remembers the wall
+// points left and right of it on its floor
+void Skyline::addWindows(Building &_b) {
+  double top = _b.base + _b.height;
+  for (double y = _b.base + floorPitch; y + windowHeight < top - wallMargin;
+       y += floorPitch) {
+    auto bottom = crossings(_b, y);
+    auto upper = crossings(_b, y + windowHeight);
+    for (size_t s = 0; s + 1 < bottom.size(); s += 2) {
+      double xl = bottom[s].second, xr = bottom[s + 1].second;
+      int columns = (xr - xl - 2 * wallMargin + windowPitch - windowWidth) /
+                    windowPitch;
+      if (columns < 1)
+        continue;
+      // centered in the floor
+      double start = (xl + xr) / 2 - (columns * windowPitch - (windowPitch - windowWidth)) / 2;
+      for (int col = 0; col < columns; ++col) {
+        double x0 = start + col * windowPitch, x1 = x0 + windowWidth;
+        // the floor above must contain the window as well (setbacks)
+        size_t u = 0;
+        while (u + 1 < upper.size() &&
+               !(upper[u].second <= x0 && x1 <= upper[u + 1].second))
+          u += 2;
+        if (u + 1 >= upper.size())
+          continue;
+
+        auto corner = [](const std::pair<EdgePoint, double> &_l,
+                         const std::pair<EdgePoint, double> &_r, double _x) {
+          return WindowCorner{_l.first, _r.first,
+                              (_x - _l.second) / (_r.second - _l.second)};
+        };
+        Window w;
+        w.corners[0] = corner(bottom[s], bottom[s + 1], x0);
+        w.corners[1] = corner(bottom[s], bottom[s + 1], x1);
+        w.corners[2] = corner(upper[u], upper[u + 1], x1);
+        w.corners[3] = corner(upper[u], upper[u + 1], x0);
+        w.lit = uniform(0, 1) < litShare;
+        _b.windows.push_back(w);
+      }
+    }
+  }
+}
+
+// current position of a window corner in the deformed outline
+Vec2 Skyline::cornerPos(const WindowCorner &_c) const {
+  auto at = [&](const EdgePoint &_e) {
+    return lerp(nodes[_e.a].pos, nodes[_e.b].pos, _e.t);
+  };
+  return lerp(at(_c.left), at(_c.right), _c.u);
+}
+
+// all windows of a layer in one batch, as holes (background color) and a few
+// lit ones; windows next to a sprouting branch are left out
+void Skyline::drawWindows(UI &_ui, int _layer) {
+  const uint8_t holeAlpha[layers] = {90, 140, 190};
+  const uint8_t litAlpha[layers] = {40, 60, 90};
+  std::vector<Vec2> holes, lit;
+  for (const Building &b : buildings) {
+    if (b.layer != _layer)
+      continue;
+    for (const Window &w : b.windows) {
+      bool torn = false;
+      for (const WindowCorner &c : w.corners)
+        for (const EdgePoint &e : {c.left, c.right})
+          torn = torn || nodes[e.a].tip || nodes[e.b].tip;
+      if (torn)
+        continue;
+      Vec2 p[4];
+      for (int k = 0; k < 4; ++k)
+        p[k] = cornerPos(w.corners[k]);
+      // torn apart by the deformation -> gone
+      if ((p[1] - p[0]).length() > 2.5 * windowWidth ||
+          (p[3] - p[0]).length() > 2.5 * windowHeight)
+        continue;
+      std::vector<Vec2> &quads = w.lit ? lit : holes;
+      quads.insert(quads.end(), p, p + 4);
+    }
+  }
+  _ui.setDrawColor(69, 133, 136, holeAlpha[_layer]); // gruv-blue
+  _ui.fillQuads(holes);
+  _ui.setAlpha(litAlpha[_layer]);
+  _ui.fillQuads(lit);
 }
 
 // main branches: from the roof and from the facades above the growth start
@@ -154,6 +258,7 @@ void Skyline::seedTips(Building &_b) {
 
   auto addTip = [&](int _k, const Vec2 &_heading, double _budget) {
     _b.tips.push_back({_b.ring[_k], _heading.normalized(), _budget, 0});
+    nodes[_b.ring[_k]].tip = true;
   };
   // roof: spread evenly over the width, fanning out to both sides
   // (the ring runs right to left over the roof)
@@ -436,6 +541,7 @@ void Skyline::draw(UI &_ui, bool _debug) {
         });
       }
     }
+    drawWindows(_ui, layer);
   }
 
   if (!_debug)

@@ -144,6 +144,26 @@ void UI::scanPolygon(const std::vector<Vec2> &_points,
   }
 }
 
+// many quads (4 corners each, in order around the quad) in one call
+void UI::fillQuads(const std::vector<Vec2> &_corners) {
+  if (_corners.size() < 4)
+    return;
+  SDL_FColor c = getFColor();
+  std::vector<SDL_Vertex> vertices;
+  std::vector<int> indices;
+  vertices.reserve(_corners.size());
+  indices.reserve(_corners.size() / 4 * 6);
+  for (size_t q = 0; q + 3 < _corners.size(); q += 4) {
+    int v = vertices.size();
+    for (int k = 0; k < 4; ++k)
+      vertices.push_back({toScreen(_corners[q + k]), c, {0, 0}});
+    for (int k : {0, 1, 2, 0, 2, 3})
+      indices.push_back(v + k);
+  }
+  SDL_RenderGeometry(renderer, nullptr, vertices.data(), vertices.size(),
+                     indices.data(), indices.size());
+}
+
 void UI::drawSpan(int _row, float _x0, float _x1) {
   SDL_RenderLine(renderer, _x0, _row + 0.5f, _x1, _row + 0.5f);
 }
