@@ -1,0 +1,274 @@
+#include "../include/cable_network.h"
+#include <algorithm>
+#include <cmath>
+
+CableNetwork::CableNetwork() {}
+CableNetwork::~CableNetwork() {}
+
+double CableNetwork::uniform(double _a, double _b) {
+  std::uniform_real_distribution<double> dist(_a, _b);
+  return dist(rng);
+}
+
+int CableNetwork::uniformInt(int _a, int _b) {
+  std::uniform_int_distribution<int> dist(_a, _b);
+  return dist(rng);
+}
+
+// sag of a cable with length _L between two points _D apart (parabola approx.)
+double CableNetwork::sagDepth(double _D, double _L) {
+  return _L > _D ? std::sqrt(3 * _D * (_L - _D) / 8) : 0;
+}
+
+void CableNetwork::generate(unsigned _seed, double _halfWidth,
+                            double _halfHeight) {
+  particles.clear();
+  links.clear();
+  bends.clear();
+  cables.clear();
+  beams.clear();
+  anchors.clear();
+  rng.seed(_seed);
+  halfWidth = _halfWidth;
+  halfHeight = _halfHeight;
+  time = 0;
+
+  // canopy: corrupted structures growing down from above the screen
+  int roots = 7;
+  for (int i = 0; i < roots; ++i) {
+    double x = -halfWidth + (i + uniform(0.2, 0.8)) * 2 * halfWidth / roots;
+    growCanopy({x, halfHeight + 2}, uniform(-0.4, 0.4), uniform(6, 9), 2, 14);
+  }
+
+  // free hanging vines
+  for (int i = 0; i < 16; ++i) {
+    int a = randomAnchor();
+    double maxLength = particles[a].pos.y + halfHeight - 3;
+    if (maxLength < 4)
+      continue;
+    addCable(a, -1, uniform(4, std::min(maxLength, 22.0)), CableType::HANGING);
+  }
+
+  // cables draped between two anchors
+  int draped = 0;
+  for (int tries = 0; tries < 500 && draped < 18; ++tries) {
+    int a = randomAnchor(), b = randomAnchor();
+    Vec2 d = particles[b].pos - particles[a].pos;
+    if (std::abs(d.x) < 4 || std::abs(d.x) > 18 || std::abs(d.y) > 8)
+      continue;
+    double D = d.length();
+    double L = D * uniform(1.05, 1.8);
+    // keep the lowest point above the bottom of the screen
+    double room = (particles[a].pos.y + particles[b].pos.y) / 2 + halfHeight - 2;
+    while (sagDepth(D, L) > room && L > D * 1.02)
+      L *= 0.95;
+    addCable(a, b, L, CableType::DRAPED);
+    draped++;
+  }
+
+  // tangles: vines with their lower end knotted into another cable
+  int tangles = 0;
+  for (int tries = 0; tries < 500 && tangles < 6; ++tries) {
+    const Cable &other = cables[uniformInt(0, cables.size() - 1)];
+    if (other.ids.size() < 8)
+      continue;
+    int p = other.ids[uniformInt(3, other.ids.size() - 3)];
+    int a = randomAnchor();
+    Vec2 d = particles[p].pos - particles[a].pos;
+    double D = d.length();
+    if (D < 3 || D > 10 || d.y > -1)
+      continue;
+    addCable(a, p, D * uniform(1.05, 1.3), CableType::TANGLED);
+    tangles++;
+  }
+
+  settle(5.0);
+}
+
+// recursive branching structure, nodes become anchors
+void CableNetwork::growCanopy(const Vec2 &_start, double _angle,
+                              double _length, int _depth, double _width) {
+  Vec2 end = _start + Vec2(0, -1).rotated(_angle) * _length;
+  end.x = std::clamp(end.x, -halfWidth + 1, halfWidth - 1);
+  beams.push_back({_start, end, _width});
+  addAnchor(end);
+  addAnchor(lerp(_start, end, 0.5));
+
+  if (_depth == 0)
+    return;
+  int children = uniformInt(2, 3);
+  for (int i = 0; i < children; ++i) {
+    double angle = std::clamp(_angle + uniform(-1.0, 1.0), -1.6, 1.6);
+    growCanopy(end, angle, _length * uniform(0.5, 0.8), _depth - 1,
+               _width * 0.6);
+  }
+}
+
+int CableNetwork::addParticle(const Vec2 &_pos, double _invMass) {
+  particles.push_back({_pos, _pos, {0, 0}, {0, 0}, _invMass});
+  return particles.size() - 1;
+}
+
+// only anchors on screen are used
+void CableNetwork::addAnchor(const Vec2 &_pos) {
+  if (_pos.y < halfHeight - 0.5 && std::abs(_pos.x) < halfWidth - 0.5)
+    anchors.push_back(addParticle(_pos, 0));
+}
+
+int CableNetwork::randomAnchor() {
+  return anchors[uniformInt(0, anchors.size() - 1)];
+}
+
+// cable from particle _start to particle _end (-1 for a free end)
+void CableNetwork::addCable(int _start, int _end, double _length,
+                            CableType _type) {
+  int n = std::max(2, (int)std::round(_length / segmentLength));
+  double rest = _length / n;
+  double invMass = 1.0 / (linearDensity * rest);
+
+  Vec2 a = particles[_start].pos;
+  Vec2 b = _end >= 0 ? particles[_end].pos : a + Vec2(0, -_length);
+  double sag = _end >= 0 ? sagDepth((b - a).length(), _length) : 0;
+
+  Cable cable;
+  cable.type = _type;
+  cable.segment = rest;
+  cable.shade = uniform(0, 1);
+  cable.ids.push_back(_start);
+  // initial shape: parabola below the chord
+  for (int i = 1; i < n; ++i) {
+    double t = (double)i / n;
+    Vec2 p = lerp(a, b, t) - Vec2(0, 4 * sag * t * (1 - t));
+    cable.ids.push_back(addParticle(p, invMass));
+  }
+  cable.ids.push_back(_end >= 0 ? _end : addParticle(b, invMass));
+
+  for (size_t i = 1; i < cable.ids.size(); ++i)
+    links.push_back({cable.ids[i - 1], cable.ids[i], rest});
+  for (size_t i = 2; i < cable.ids.size(); ++i)
+    bends.push_back({cable.ids[i - 2], cable.ids[i], 2 * rest});
+  cables.push_back(cable);
+}
+
+// let the cables come to rest before the simulation starts
+void CableNetwork::settle(double _seconds) {
+  bool wind = windOn;
+  windOn = false;
+  int steps = _seconds * 60;
+  for (int i = 0; i < steps; ++i) {
+    for (int s = 0; s < 10; ++s)
+      substep(1.0 / 600);
+    // strong damping to kill the swinging
+    for (auto &p : particles)
+      p.vel *= 0.9;
+  }
+  windOn = wind;
+  time = 0;
+}
+
+void CableNetwork::clearForces() {
+  for (auto &p : particles)
+    p.force = {0, 0};
+}
+
+// gentle gusts travelling through the canopy
+double CableNetwork::windAt(const Vec2 &_pos) const {
+  return windStrength * (std::sin(0.4 * time + 0.15 * _pos.x) +
+                         0.5 * std::sin(1.3 * time + 0.4 * _pos.y + 1.0));
+}
+
+// one position based dynamics substep (predict, project, update velocity)
+void CableNetwork::substep(double _h) {
+  time += _h;
+  for (auto &p : particles) {
+    if (p.invMass == 0)
+      continue;
+    Vec2 acc = gravity + p.force * p.invMass;
+    if (windOn)
+      acc.x += windAt(p.pos);
+    p.vel += acc * _h;
+    p.prev = p.pos;
+    p.pos += p.vel * _h;
+  }
+
+  for (int it = 0; it < iterations; ++it) {
+    // alternate the direction to avoid a bias along the cables
+    int n = links.size();
+    for (int k = 0; k < n; ++k)
+      solveLink(links[it % 2 == 0 ? k : n - 1 - k], 1.0);
+    // bending only resists being shortened (a vine can bend, but not kink)
+    for (const Link &l : bends)
+      if ((particles[l.b].pos - particles[l.a].pos).length() < l.rest)
+        solveLink(l, bendStiffness);
+  }
+
+  double keep = std::max(0.0, 1 - damping * _h);
+  for (auto &p : particles) {
+    if (p.invMass == 0)
+      continue;
+    p.vel = (p.pos - p.prev) / _h * keep;
+  }
+}
+
+// move both particles to restore the rest length (weighted by mass)
+void CableNetwork::solveLink(const Link &_l, double _stiffness) {
+  Particle &pa = particles[_l.a];
+  Particle &pb = particles[_l.b];
+  double w = pa.invMass + pb.invMass;
+  if (w == 0)
+    return;
+  Vec2 d = pb.pos - pa.pos;
+  double len = d.length();
+  if (len < 1e-9)
+    return;
+  Vec2 corr = d * (_stiffness * (len - _l.rest) / (len * w));
+  pa.pos += corr * pa.invMass;
+  pb.pos -= corr * pb.invMass;
+}
+
+Vec2 CableNetwork::getPoint(const CablePoint &_cp) const {
+  const Cable &c = cables[_cp.cable];
+  int maxU = c.ids.size() - 1;
+  double u = std::clamp(_cp.u, 0.0, (double)maxU);
+  int k = std::min((int)u, maxU - 1);
+  return lerp(particles[c.ids[k]].pos, particles[c.ids[k + 1]].pos, u - k);
+}
+
+Vec2 CableNetwork::getVelocity(const CablePoint &_cp) const {
+  const Cable &c = cables[_cp.cable];
+  int maxU = c.ids.size() - 1;
+  double u = std::clamp(_cp.u, 0.0, (double)maxU);
+  int k = std::min((int)u, maxU - 1);
+  return lerp(particles[c.ids[k]].vel, particles[c.ids[k + 1]].vel, u - k);
+}
+
+// split a force onto the two particles of the segment
+void CableNetwork::applyForce(const CablePoint &_cp, const Vec2 &_f) {
+  const Cable &c = cables[_cp.cable];
+  int maxU = c.ids.size() - 1;
+  double u = std::clamp(_cp.u, 0.0, (double)maxU);
+  int k = std::min((int)u, maxU - 1);
+  double t = u - k;
+  particles[c.ids[k]].force += _f * (1 - t);
+  particles[c.ids[k + 1]].force += _f * t;
+}
+
+void CableNetwork::draw(UI &_ui) {
+  // canopy structure in the background
+  _ui.setAlpha(45);
+  for (const Beam &b : beams) {
+    _ui.drawThickLine(b.a, b.b, b.width);
+    _ui.fillCircle(b.b, b.width / 2 / _ui.scale);
+  }
+
+  // cables
+  for (const Cable &c : cables) {
+    _ui.setAlpha(150 + 90 * c.shade);
+    double width = c.type == CableType::DRAPED ? 3 : 2;
+    for (size_t i = 1; i < c.ids.size(); ++i)
+      _ui.drawThickLine(particles[c.ids[i - 1]].pos, particles[c.ids[i]].pos,
+                        width);
+    // mount on the canopy
+    _ui.fillCircle(particles[c.ids[0]].pos, 3 / _ui.scale);
+  }
+}

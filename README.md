@@ -1,0 +1,53 @@
+# Chasm City Cable Car
+
+## Overview
+A 2D take on the cable cars of Alastair Reynolds' *Chasm City*. Vines hang from a canopy of corrupted buildings, some free, some draped between two points, some knotted into other vines. A pod with four telescopic arms climbs through them: the arms reach for the vines with their hooks, carry the pod, and let go again to move along the canopy. A controller keeps the pod stable while it moves to the position given by the mouse or the arrow keys.
+
+## Installation
+Dependencies: a C++17 compiler and [SDL3](https://github.com/libsdl-org/SDL) (for the web build [emsdk](https://emscripten.org), which ships an SDL3 port).
+
+Build:
+```
+chmod +x build.sh
+./build.sh
+```
+On Windows via WSL (Ubuntu 24.04 has no SDL3 package, see the script header to build it locally):
+```
+./build_windows.sh           # native + wasm
+./build_windows.sh native    # native binary only
+./build_windows.sh wasm      # cable_car.js/.wasm for the website
+```
+Run with:
+```
+./bin/cable_car
+```
+
+## Controls
+Mouse - desired pod position
+Arrow keys - move the desired position
+C - toggle controller (pod hangs passively from its grips)
+W - toggle wind
+T - toggle the trail drawn by the pod
+D - debug view (reach, preferred grips, arm forces, reference)
+R - respawn the pod
+G - grow new vines
+P - screenshot (native)
+Space - pause
+Q / Esc - quit
+
+## Details
+
+### Vines
+The vines are chains of particles simulated with position based dynamics (30 substeps per frame, distance constraints between neighbours, a soft bending constraint over two segments). Anchors on the canopy are particles with infinite mass. The canopy itself is a randomly grown branching structure, its nodes are the anchor points.
+
+### Pod and arms
+The pod is a rigid body (position, orientation) with 40 kg. Each arm consists of two links which telescope together; inverse kinematics (law of cosines, like the double pendulum robot arm) places the elbow away from the pod, the telescope keeps the elbow at a comfortable bend. Every arm can apply a limited force between its shoulder and the hook; the reaction force acts on the vine, so the pod's weight pulls the vines down. When an arm is stretched to its limit a stiff mechanical stop engages.
+
+### Controller
+A reference point moves towards the target with limited speed and acceleration. A PD law on the reference plus gravity compensation gives the desired force, a PD law on the orientation the desired torque. This wrench is distributed onto the grasping arms by a weighted least norm solution (forces along an arm are cheaper than across it) and clipped to the motor strength.
+
+### Gait
+Every arm has a preferred grip: out in its natural direction and shifted towards the target. Grip candidates on all vines within reach are scored by their distance to it, with penalties for crowding other hooks, reaching across the pod and floppy vine tips.
+- free arms reach for the best candidate
+- grasping arms slide along their vine towards a better spot (climbing)
+- if at least three arms hold on, the one whose grip can be improved the most lets go and reaches for the better grip

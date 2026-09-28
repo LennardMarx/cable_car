@@ -1,0 +1,15 @@
+# Build output (cable_car.js/.wasm stay tracked, the website serves them)
+build/
+bin/
+*.o
+*.exe
+
+# Tooling
+.cache/
+compile_commands.json
+
+# Misc
+ideas
+*.desktop
+run.sh
+screenshot_*.bmp
