@@ -7,6 +7,7 @@
 #include "cable_network.h"
 #include "event_checks.h"
 #include "helper_variables.h"
+#include "path_planner.h"
 #include "vec2.h"
 
 #ifdef __EMSCRIPTEN__
@@ -33,6 +34,7 @@ struct context {
 
   CableNetwork cableNetwork;
   CableCar cableCar;
+  PathPlanner pathPlanner;
   HelperVars helperVars;
   EventChecks eventChecks;
 
@@ -41,6 +43,9 @@ struct context {
   unsigned seed = 3;          // world generation
 
   Vec2 target; // desired pod position (mouse / arrow keys)
+  Vec2 plannedTarget;      // target of the current path
+  double replanTimer = 0;  // time until the path is planned again
+  const double replanInterval = 0.5;
 
   int frameCount = 0;
 };

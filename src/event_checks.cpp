@@ -39,6 +39,9 @@ void EventChecks::checkEvents(HelperVars &_helperVars, CableCar &_cableCar,
       case SDLK_D:
         _helperVars.toggleDebug();
         break;
+      case SDLK_F:
+        _helperVars.togglePathOn();
+        break;
       case SDLK_W:
         _cableNetwork.toggleWind();
         break;

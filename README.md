@@ -26,9 +26,10 @@ Run with:
 Mouse - desired pod position
 Arrow keys - move the desired position
 C - toggle controller (pod hangs passively from its grips)
+F - toggle path finding (off: straight towards the target)
 W - toggle wind
 T - toggle the trail drawn by the pod
-D - debug view (reach, preferred grips, arm forces, reference)
+D - debug view (reach, preferred grips, arm forces, reference, supported area)
 R - respawn the pod
 G - grow new vines
 P - screenshot (native)
@@ -44,7 +45,10 @@ The vines are chains of particles simulated with position based dynamics (30 sub
 The pod is a rigid body (position, orientation) with 40 kg. Each arm consists of two links which telescope together; inverse kinematics (law of cosines, like the double pendulum robot arm) places the elbow away from the pod, the telescope keeps the elbow at a comfortable bend. Every arm can apply a limited force between its shoulder and the hook; the reaction force acts on the vine, so the pod's weight pulls the vines down. When an arm is stretched to its limit a stiff mechanical stop engages.
 
 ### Controller
-A reference point moves towards the target with limited speed and acceleration. A PD law on the reference plus gravity compensation gives the desired force, a PD law on the orientation the desired torque. This wrench is distributed onto the grasping arms by a weighted least norm solution (forces along an arm are cheaper than across it) and clipped to the motor strength.
+A reference point moves towards the target with limited speed and acceleration. A PD law on the reference plus gravity compensation gives the desired force, a PD law on the orientation the desired torque. This wrench is distributed onto the grasping arms by a weighted least norm solution (forces along an arm are cheaper than across it) and limited to the motor strength. When the arms are too weak for everything, leveling keeps priority over carrying the weight, which keeps priority over moving; the torque of the mechanical stops is compensated.
+
+### Path finding
+The world is covered by a 1 m grid. For every cell the planner counts the distinct vines a pod there could reach (from the current, moving cable positions). Cells with at least three vines are supported. Dijkstra from the pod finds everything reachable over supported cells, with steps through weakly supported cells costing more, so wide, dense corridors are preferred. The goal is the reachable cell closest to the target (the target itself if possible); the path is shortened by string pulling and, if the target lies outside the supported area, the last bit is taken directly. The controller follows a point 3 m ahead on the path; the path is renewed every 0.5 s or when the target moves.
 
 ### Gait
 Every arm has a preferred grip: out in its natural direction and shifted towards the target. Grip candidates on all vines within reach are scored by their distance to it, with penalties for crowding other hooks, reaching across the pod and floppy vine tips.

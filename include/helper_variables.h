@@ -25,6 +25,9 @@ public:
   void toggleDebug() { debug = !debug; }
   bool getDebug() { return debug; }
 
+  void togglePathOn() { pathOn = !pathOn; }
+  bool getPathOn() { return pathOn; }
+
   void toggleScreenshot() { screenshot = !screenshot; }
   bool getScreenshot() { return screenshot; }
 
@@ -38,6 +41,7 @@ private:
   static inline bool trajOn = true;
   static inline bool debug = false;
   static inline bool screenshot = false;
+  static inline bool pathOn = true; // path finding instead of direct line
   static inline std::vector<Vec2> trajectory;
 };
 

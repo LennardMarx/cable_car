@@ -23,7 +23,19 @@ void SimLoop::update(context *ctx) {
   // keep the target on screen
   ctx->target.x = std::clamp(ctx->target.x, -ctx->halfWidth + 1, ctx->halfWidth - 1);
   ctx->target.y = std::clamp(ctx->target.y, -ctx->halfHeight + 1, ctx->halfHeight - 1);
-  ctx->cableCar.setTarget(ctx->target);
+
+  // plan a path through the vines, the pod follows a point ahead on it
+  Vec2 pos = ctx->cableCar.getPosition();
+  ctx->replanTimer -= ctx->dt;
+  if (ctx->replanTimer <= 0 || (ctx->target - ctx->plannedTarget).length() > 0.5) {
+    ctx->pathPlanner.plan(ctx->cableNetwork, pos, ctx->target);
+    ctx->plannedTarget = ctx->target;
+    ctx->replanTimer = ctx->replanInterval;
+  }
+  if (ctx->helperVars.getPathOn())
+    ctx->cableCar.setTarget(ctx->pathPlanner.getWaypoint(pos));
+  else
+    ctx->cableCar.setTarget(ctx->target);
 
   // gait planning once per step, physics in substeps
   ctx->cableCar.plan(ctx->cableNetwork, ctx->dt);
@@ -39,8 +51,10 @@ void SimLoop::update(context *ctx) {
   ctx->helperVars.getTrajectory().push_back(ctx->cableCar.getPosition());
 
   // fell off the canopy -> respawn
-  if (ctx->cableCar.getPosition().y < -ctx->halfHeight - 6)
+  if (ctx->cableCar.getPosition().y < -ctx->halfHeight - 6) {
     ctx->cableCar.reset(ctx->cableNetwork, ctx->target);
+    ctx->replanTimer = 0;
+  }
 }
 
 void SimLoop::render(context *ctx) {
@@ -49,6 +63,8 @@ void SimLoop::render(context *ctx) {
   ctx->cableNetwork.draw(ctx->ui);
   if (ctx->helperVars.getTrajOn())
     ctx->ui.drawTrajectory(ctx->helperVars.getTrajectory(), 200);
+  if (ctx->helperVars.getPathOn())
+    ctx->pathPlanner.draw(ctx->ui, ctx->helperVars.getDebug());
   ctx->cableCar.draw(ctx->ui, ctx->helperVars.getDebug());
 
   // target crosshair
@@ -83,6 +99,7 @@ void SimLoop::mainloop(void *arg) {
   if (ctx->helperVars.getReset()) {
     ctx->cableCar.reset(ctx->cableNetwork, ctx->target);
     ctx->helperVars.getTrajectory().clear();
+    ctx->replanTimer = 0;
     ctx->helperVars.toggleReset();
   }
   if (ctx->helperVars.getRegenerate()) {
@@ -90,6 +107,7 @@ void SimLoop::mainloop(void *arg) {
     ctx->cableNetwork.generate(ctx->seed, ctx->halfWidth, ctx->halfHeight);
     ctx->cableCar.reset(ctx->cableNetwork, ctx->target);
     ctx->helperVars.getTrajectory().clear();
+    ctx->replanTimer = 0;
     ctx->helperVars.toggleRegenerate();
   }
 
