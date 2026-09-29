@@ -45,7 +45,7 @@ build_wasm() {
   fi
   # shellcheck disable=SC1090
   source "$EMSDK_ENV" >/dev/null 2>&1
-  emcc src/*.cpp -std=c++17 -s WASM=1 -s USE_SDL=3 -O3 -o cable_car.js
+  emcc src/*.cpp -std=c++17 -s WASM=1 -s USE_SDL=3 -s ALLOW_MEMORY_GROWTH=1 -O3 -o cable_car.js
   echo ">> Done. Serve from the website root and open projects/cable_car/cable_car.html"
 }
 
@@ -59,7 +59,7 @@ build_demo() {
   if [ -f "$EMSDK_ENV" ]; then
     # shellcheck disable=SC1090
     source "$EMSDK_ENV" >/dev/null 2>&1
-    emcc $DEMO_SOURCES -std=c++17 -Iinclude/ -s WASM=1 -s USE_SDL=3 -O3       -o growth_demo.js
+    emcc $DEMO_SOURCES -std=c++17 -Iinclude/ -s WASM=1 -s USE_SDL=3 -s ALLOW_MEMORY_GROWTH=1 -O3       -o growth_demo.js
   fi
   echo ">> Done. Run it with: ./bin/growth_demo"
 }

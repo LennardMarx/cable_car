@@ -19,7 +19,7 @@ option(USE_EMSCRIPTEN "Build with Emscripten" OFF)
 if (USE_EMSCRIPTEN)
     # Emscripten setup
     set(CMAKE_CXX_COMPILER emcc)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -s WASM=1 -s USE_SDL=3 -O3")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -s WASM=1 -s USE_SDL=3 -s ALLOW_MEMORY_GROWTH=1 -O3")
     set(CMAKE_EXECUTABLE_SUFFIX ".js")
 
     # Output target for Emscripten
