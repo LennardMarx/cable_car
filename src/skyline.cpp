@@ -37,7 +37,7 @@ void Skyline::generate(unsigned _seed, double _halfWidth, double _halfHeight) {
       double h = uniform(minH[layer], maxH[layer]);
       double room = std::max(0.0, slot - w - 8) / 2;
       double cx = -halfWidth + (i + 0.5) * slot + uniform(-room, room);
-      int style = std::uniform_int_distribution<int>(0, 4)(rng);
+      int style = std::uniform_int_distribution<int>(0, styles - 1)(rng);
       addBuilding(outline(style, cx, w, h, ground), cx, ground, h, layer);
     }
   }
@@ -123,10 +123,15 @@ void Skyline::addBuilding(const std::vector<Vec2> &_corners, double _cx,
     int n = std::max(1, (int)std::round((c - a).length() / edge));
     for (int s = 0; s < n; ++s) {
       nodes.push_back({lerp(a, c, (double)s / n), index, _layer, edge, 0});
+      nodes.back().home = nodes.back().pos;
       b.ring.push_back(nodes.size() - 1);
     }
   }
   b.maxNodes = maxGrowth * b.ring.size();
+  b.swayAmp = uniform(minSway, maxSway) * (uniform(0, 1) < 0.5 ? 1 : -1);
+  b.swayFreq = uniform(0.015, 0.035);
+  b.swayPhase = uniform(0, 2 * M_PI);
+  b.flare = uniform(minFlare, maxFlare);
   buildings.push_back(b);
   ringPos.resize(nodes.size());
   for (size_t k = 0; k < b.ring.size(); ++k)
@@ -284,30 +289,64 @@ void Skyline::seedTips(Building &_b) {
       left.push_back(k);
   }
 
-  auto addTip = [&](int _k, const Vec2 &_heading, double _budget) {
-    _b.tips.push_back({_b.ring[_k], _heading.normalized(), _budget, 0});
-    nodes[_b.ring[_k]].tip = true;
+  // main branches about a fifth of the tower wide
+  double minX = nodes[_b.ring[0]].pos.x, maxX = minX;
+  for (int i : _b.ring) {
+    minX = std::min(minX, nodes[i].pos.x);
+    maxX = std::max(maxX, nodes[i].pos.x);
+  }
+  int cap = std::clamp((int)std::round(limbShare * (maxX - minX) / (2 * edge)), 1, 4);
+  // long enough to reach the canopy and spread along it
+  auto length = [&](const Vec2 &_p) {
+    return std::max(0.0, canopyHeight - _p.y) * 1.15 + uniform(minSpread, maxSpread);
   };
+
   // roof: spread evenly over the width, fanning out to both sides
   // (the ring runs right to left over the roof)
-  int count = std::clamp((int)std::round(_b.height / 60), 2, 4);
+  int count = std::clamp((int)std::round(_b.height / 80), 1, 3);
   for (int t = 0; t < count && !roof.empty(); ++t) {
     int k = roof[(t * 2 + 1) * roof.size() / (2 * count)];
     double f = (t + 0.5) / count; // 0 right ... 1 left
     double angle = roofFan * (2 * f - 1) + uniform(-0.15, 0.15);
-    addTip(k, Vec2(0, 1).rotated(angle), uniform(minLimb, maxLimb));
+    addTip(_b, k, Vec2(0, 1).rotated(angle), length(nodes[_b.ring[k]].pos), 0,
+           cap);
   }
-  // facades: reaching out and up, longer the higher they start (broccoli)
-  double bottom = std::max(growthStart, _b.base);
+  // facades: reaching out and up
   for (auto *side : {&left, &right}) {
     for (int t = 0; t < facadeTips && !side->empty(); ++t) {
       int k = (*side)[std::uniform_int_distribution<int>(0, side->size() - 1)(rng)];
-      Vec2 p = nodes[_b.ring[k]].pos;
-      double up = std::clamp((p.y - bottom) / (top - bottom), 0.0, 1.0);
-      Vec2 heading = (outwardNormal(_b, k) + Vec2(0, 0.7)).rotated(uniform(-0.2, 0.2));
-      addTip(k, heading, (0.25 + 0.75 * up) * uniform(minLimb, maxLimb));
+      Vec2 heading = (outwardNormal(_b, k) + Vec2(0, 1.2)).rotated(uniform(-0.2, 0.2));
+      addTip(_b, k, heading, length(nodes[_b.ring[k]].pos), 0, cap);
     }
   }
+}
+
+// no other branch cap overlaps the ring around position _k
+bool Skyline::capFree(const Building &_b, int _k, int _cap) const {
+  int n = _b.ring.size();
+  for (const GrowthTip &tip : _b.tips) {
+    int d = std::abs(ringPos[tip.node] - _k);
+    d = std::min(d, n - d);
+    if (d <= _cap + tip.cap + 2)
+      return false;
+  }
+  return true;
+}
+
+// branch at ring position _k, its cap starts as wide as the outline there
+void Skyline::addTip(Building &_b, int _k, const Vec2 &_heading,
+                     double _length, int _depth, int _cap) {
+  if (!capFree(_b, _k, _cap))
+    return;
+  int n = _b.ring.size();
+  double width = 0;
+  for (int j : {-_cap, _cap})
+    width += (nodes[_b.ring[((_k + j) % n + n) % n]].pos -
+              nodes[_b.ring[_k]].pos).length() / 2;
+  _b.tips.push_back({_b.ring[_k], _heading.normalized(), _length, _depth,
+                     _cap, width, _length});
+  for (int j = -_cap; j <= _cap; ++j)
+    nodes[_b.ring[((_k + j) % n + n) % n]].tip = true;
 }
 
 // 0 below the growth start (unchanged city), rising to 1 above it
@@ -316,16 +355,32 @@ double Skyline::growthMask(const Building &, const Vec2 &_p) const {
   return t * t * (3 - 2 * t);
 }
 
-// preferred growth direction: up in the middle, up and out at the sides
+// preferred growth direction: a fan (up in the middle, up and out at the
+// sides), turning sideways below the canopy so the limbs form its underside
 Vec2 Skyline::growthDir(const Building &_b, const Vec2 &_p) const {
   double side = std::clamp((_p.x - _b.cx) / 15, -1.0, 1.0);
-  return Vec2(spread * side, 1).normalized();
+  Vec2 fan = Vec2(spread * side, 1).normalized();
+  Vec2 flat(_p.x < _b.cx ? -1 : 1, 0);
+  double t = std::clamp((_p.y - (canopyHeight - canopyBand)) / canopyBand, 0.0, 1.0);
+  return lerp(fan, flat, t * t).normalized();
 }
 
 Vec2 Skyline::outwardNormal(const Building &_b, int _k) const {
   int n = _b.ring.size();
   Vec2 t = nodes[_b.ring[(_k + 1) % n]].pos - nodes[_b.ring[(_k + n - 1) % n]].pos;
   return Vec2(t.y, -t.x).normalized(); // ring is counter clockwise
+}
+
+// warp of an original building point at full growth: the upper tower sways
+// sideways along its height and flares out, nothing below the growth start
+Vec2 Skyline::morphOffset(const Building &_b, const Vec2 &_home) const {
+  double g = growthMask(_b, _home);
+  double dy = _home.y - growthStart;
+  // flare grows with the height: vase shaped trunks
+  double up = std::clamp(dy / (_b.base + _b.height - growthStart), 0.0, 1.0);
+  return Vec2(_b.swayAmp * std::sin(_b.swayFreq * dy + _b.swayPhase) * g +
+                  (_home.x - _b.cx) * _b.flare * up * up,
+              0.3 * _b.swayAmp * std::sin(0.7 * _b.swayFreq * _home.x + _b.swayPhase) * g);
 }
 
 // 1 up to the top of the tower, shrinking towards the ends of the branches
@@ -369,10 +424,14 @@ void Skyline::step() {
   // roughness follows the growth burst, the outline calms down afterwards
   double rough = jitter * std::max(roughFloor, growthBoost() / burst);
   int hardenSteps = hardenTime * stepsPerSecond;
+  double morph = 1 - std::exp(-growthSteps / stepsPerSecond / morphTime);
   std::vector<char> isTip(nodes.size(), 0);
-  for (const Building &b : buildings)
+  for (const Building &b : buildings) {
+    int n = b.ring.size();
     for (const GrowthTip &tip : b.tips)
-      isTip[tip.node] = 1;
+      for (int j = -tip.cap; j <= tip.cap; ++j)
+        isTip[b.ring[((ringPos[tip.node] + j) % n + n) % n]] = 1;
+  }
 
   for (const Building &b : buildings) {
     int n = b.ring.size();
@@ -384,14 +443,20 @@ void Skyline::step() {
       double g = growthMask(b, x);
       if (g <= 0)
         continue; // frozen skyscraper
-      if (!isTip[i] && growthSteps - nodes[i].born > hardenSteps)
+      bool wood = nodes[i].born > 0 || nodes[i].tip; // not the building
+      if (!isTip[i] && wood && growthSteps - nodes[i].born > hardenSteps)
         continue; // grown wood keeps its shape
 
       // finer detail higher up in the crown -> branches taper into spikes
       double radius = repelRadius * detailScale(b, x);
 
       Vec2 f;
-      if (!isTip[i]) {
+      if (!isTip[i] && !wood) {
+        // original building: follows the smooth warp, branches don't drag it
+        // along, new wood is added between it and the branches instead
+        Vec2 home = nodes[i].home + morphOffset(b, nodes[i].home) * morph;
+        f += (home - x) * kHome;
+      } else if (!isTip[i]) {
         // springs to the neighbours
         for (int q : {prev, nxt}) {
           Vec2 d = nodes[q].pos - x;
@@ -403,7 +468,7 @@ void Skyline::step() {
         // smoothing towards the neighbours' midpoint
         f += ((nodes[prev].pos + nodes[nxt].pos) / 2 - x) * kSmooth;
         // roughness
-        f += Vec2(uniform(-1, 1), uniform(-1, 1)) * rough;
+        f += Vec2(uniform(-1, 1), uniform(-1, 1)) * (rough * woodRough);
       }
 
       // repulsion from all other nodes of the same layer
@@ -452,10 +517,28 @@ void Skyline::step() {
   growthSteps++;
 }
 
+// the cap moves as a block along the heading and is pulled into a pointed
+// shape, which narrows while the branch grows
 void Skyline::moveTips(Building &_b, double _boost) {
+  int n = _b.ring.size();
   for (const GrowthTip &tip : _b.tips) {
-    Vec2 f = moves[tip.node] + tip.heading * (tipSpeed * _boost);
-    moves[tip.node] = f.clampedLength(maxTipStep);
+    Vec2 advance = tip.heading * (tipSpeed * _boost);
+    Vec2 end = nodes[tip.node].pos;
+    Vec2 side = tip.heading.perp(); // +ring direction (ccw ring)
+    double grown = std::clamp(1 - tip.budget / tip.length, 0.0, 1.0);
+    double width = tip.width * (1 - (1 - endWidth) * grown);
+    int k = ringPos[tip.node];
+    for (int j = -tip.cap; j <= tip.cap; ++j) {
+      int node = _b.ring[((k + j) % n + n) % n];
+      Vec2 f = moves[node] + advance;
+      if (j != 0) {
+        double s = (double)j / tip.cap;
+        Vec2 target = end + side * (width * s) -
+                      tip.heading * (width * std::abs(s) * pointiness);
+        f += (target - nodes[node].pos) * capStiffness;
+      }
+      moves[node] = f.clampedLength(maxTipStep);
+    }
   }
 }
 
@@ -470,16 +553,37 @@ void Skyline::updateTips(Building &_b) {
 
     // dead wood: straight pieces with sudden kinks, slowly bending towards
     // the growth direction, never hanging down
+    // kinks zig-zag and keep the limb near its growth direction (no hooks)
     if (uniform(0, 1) < grown / kinkLength) {
-      double angle = uniform(minKink, maxKink);
-      tip.heading = tip.heading.rotated(uniform(0, 1) < 0.5 ? angle : -angle);
+      double angle = uniform(minKink, maxKink) * -tip.lastKink;
+      if (uniform(0, 1) < 0.25)
+        angle = -angle;
+      Vec2 dir = growthDir(_b, nodes[tip.node].pos);
+      Vec2 turned = tip.heading.rotated(angle);
+      if (turned.dot(dir) < std::cos(maxDeviation))
+        turned = tip.heading.rotated(-angle);
+      if (turned.dot(dir) >= std::cos(maxDeviation)) {
+        tip.heading = turned;
+        tip.lastKink = angle > 0 ? 1 : -1;
+      }
     }
     tip.heading += growthDir(_b, nodes[tip.node].pos) * tropism;
+    // straight up to the canopy, there the limbs turn sideways (elbow)
+    Vec2 p = nodes[tip.node].pos;
+    double band = std::clamp((p.y - (canopyHeight - canopyBand)) / canopyBand, 0.0, 1.0);
+    Vec2 flat(tip.heading.x >= 0 ? 1 : -1, 0);
+    tip.heading += flat * (canopyTurn * band);
     tip.heading.y = std::max(tip.heading.y, -0.1);
+    if (nodes[tip.node].pos.y > canopyHeight)
+      tip.heading.y = std::min(tip.heading.y, 0.0); // the canopy is flat
     tip.heading = tip.heading.normalized();
 
     // occasional side branch, the tip itself keeps growing
-    if (tip.depth < maxDepth && uniform(0, 1) < grown / branchLength)
+    // side branches become more frequent towards the canopy
+    double height = std::clamp((nodes[tip.node].pos.y - growthStart) /
+                                   (canopyHeight - growthStart), 0.0, 1.0);
+    if (tip.depth < maxDepth &&
+        uniform(0, 1) < grown / branchLength * (0.2 + 0.8 * height))
       spawned.push_back(tip);
   }
   // finished, blocked or out of room
@@ -500,17 +604,14 @@ void Skyline::branch(Building &_b, const GrowthTip &_parent) {
     return;
   int n = _b.ring.size();
   int side = uniform(0, 1) < 0.5 ? 1 : -1; // +1: left flank (ccw ring)
-  int back = std::uniform_int_distribution<int>(3, 8)(rng);
+  int cap = std::max(1, _parent.cap - 1);   // side branches are thinner
+  int back = _parent.cap + cap + std::uniform_int_distribution<int>(1, 5)(rng);
   int k = ((ringPos[_parent.node] + side * back) % n + n) % n;
-  int node = _b.ring[k];
-  if (growthMask(_b, nodes[node].pos) < 0.5)
+  if (growthMask(_b, nodes[_b.ring[k]].pos) < 0.5)
     return;
-  for (const GrowthTip &tip : _b.tips)
-    if (tip.node == node)
-      return;
   Vec2 heading = _parent.heading.rotated(side * uniform(0.5, 1.0));
-  _b.tips.push_back({node, heading, _parent.budget * uniform(0.4, 0.7),
-                     _parent.depth + 1});
+  addTip(_b, k, heading, _parent.budget * uniform(0.5, 0.8), _parent.depth + 1,
+         cap);
 }
 
 // split edges which got too long (behind the tips), keeps node positions

@@ -102,6 +102,33 @@ int CableNetwork::randomAnchor() {
   return anchors[uniformInt(0, anchors.size() - 1)];
 }
 
+// in 2D the bending keeps a rope from unwinding a loop (it would have to
+// pass a kink), so cables which cross themselves bend freely for a moment
+void CableNetwork::unloop(double _dt) {
+  for (Cable &c : cables)
+    c.bendOff = std::max(0.0, c.bendOff - _dt);
+  loopTimer -= _dt;
+  if (loopTimer > 0)
+    return;
+  loopTimer = loopCheck;
+
+  auto crosses = [&](Vec2 _a, Vec2 _b, Vec2 _c, Vec2 _d) {
+    auto side = [](Vec2 _p, Vec2 _q, Vec2 _r) { return (_q - _p).cross(_r - _p); };
+    return side(_a, _b, _c) * side(_a, _b, _d) < 0 &&
+           side(_c, _d, _a) * side(_c, _d, _b) < 0;
+  };
+  for (Cable &c : cables) {
+    int n = c.ids.size();
+    bool looped = false;
+    for (int i = 0; i + 1 < n && !looped; ++i)
+      for (int j = i + 2; j + 1 < n && !looped; ++j)
+        looped = crosses(particles[c.ids[i]].pos, particles[c.ids[i + 1]].pos,
+                         particles[c.ids[j]].pos, particles[c.ids[j + 1]].pos);
+    if (looped)
+      c.bendOff = unbendTime;
+  }
+}
+
 void CableNetwork::setAnchorTargets(const std::vector<Vec2> &_targets) {
   for (size_t k = 0; k < anchors.size() && k < _targets.size(); ++k) {
     anchorFrom[k] = particles[anchors[k]].pos;
@@ -120,13 +147,14 @@ void CableNetwork::moveAnchors(double _t) {
 // being torn (rest lengths grow with the distance of its ends)
 void CableNetwork::payOut() {
   for (Cable &c : cables) {
-    if (c.type != CableType::DRAPED)
-      continue;
+    if (c.type == CableType::HANGING)
+      continue; // both ends held: between anchors or tied into a cable
     int segments = c.ids.size() - 1;
     double chord = (particles[c.ids.back()].pos - particles[c.ids[0]].pos).length();
     if (chord < taut * c.segment * segments)
       continue;
-    c.segment = chord / (taut * segments);
+    double slack = c.type == CableType::TANGLED ? tiedSlack : payOutSlack;
+    c.segment = chord * slack / segments; // sag again
     for (int k = 0; k < segments; ++k)
       links[c.firstLink + k].rest = c.segment;
     for (int k = 0; k + 1 < segments; ++k)
@@ -218,9 +246,15 @@ void CableNetwork::substep(double _h) {
     for (int k = 0; k < n; ++k)
       solveLink(links[it % 2 == 0 ? k : n - 1 - k], 1.0);
     // bending only resists being shortened (a vine can bend, but not kink)
-    for (const Link &l : bends)
-      if (bendOn && (particles[l.b].pos - particles[l.a].pos).length() < l.rest)
-        solveLink(l, bendStiffness);
+    for (const Cable &c : cables) {
+      if (!bendOn || c.bendOff > 0)
+        continue;
+      for (size_t k = 0; k + 2 < c.ids.size(); ++k) {
+        const Link &l = bends[c.firstBend + k];
+        if ((particles[l.b].pos - particles[l.a].pos).length() < l.rest)
+          solveLink(l, bendStiffness);
+      }
+    }
   }
 
   double keep = std::max(0.0, 1 - damping * _h);
@@ -274,15 +308,16 @@ void CableNetwork::applyForce(const CablePoint &_cp, const Vec2 &_f) {
   particles[c.ids[k + 1]].force += _f * t;
 }
 
-void CableNetwork::draw(UI &_ui) {
+void CableNetwork::draw(UI &_ui, const CableStyle &_style) {
   // cables, between the translucent city and the solid pod
   for (const Cable &c : cables) {
-    _ui.setAlpha(95 + 45 * c.shade);
+    _ui.setAlpha(_style.alpha + _style.alphaSpread * c.shade);
     double width = c.type == CableType::DRAPED ? 2.5 : 2;
     for (size_t i = 1; i < c.ids.size(); ++i)
       _ui.drawThickLine(particles[c.ids[i - 1]].pos, particles[c.ids[i]].pos,
                         width);
     // mount on the building
-    _ui.fillCircle(particles[c.ids[0]].pos, 2.5 / _ui.scale);
+    if (_style.mounts)
+      _ui.fillCircle(particles[c.ids[0]].pos, 2.5 / _ui.scale);
   }
 }

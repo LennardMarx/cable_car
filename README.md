@@ -42,19 +42,25 @@ A standalone demo (`bin/growth_demo`, `growth_demo.html`) for the background: fu
 Controls: Space - pause, R - restart, G - new skyline, Up/Down - growth speed, D - show nodes (brightness = growth mask), P - screenshot, Q / Esc - quit
 
 Every building is a closed outline of nodes (counter clockwise). Below the growth start (a bit under half the screen height) the city stays unchanged, above it the outline grows into wide, broccoli-like dead trees:
-- branches are growth tips which keep extending along their heading and drag the outline with them into a limb; straight pieces with sudden kinks, bending slowly up and outwards
-- main branches start on the roof and on the facades, side branches split off only occasionally (about one per 15 m, at most two levels deep, at most 10 growing tips per tower), so limbs continue growing rather than splitting
-- springs keep the edges near their rest length, repulsion (spatial hash) keeps the outlines apart, a little random jitter makes them rugged during the growth burst
+- branches grow out of the building as new wood: a cap of outline nodes moves with each tip as a block (pointed, narrowing over the growth), the stretched flanks behind it fill with new nodes; the original building is not dragged along, it only follows a smooth warp (sway and flare of the upper tower, the windows follow)
+- modelled on the Chasm City sketch: trunks flare towards the top (vase shape), straight limbs (about a fifth of the tower wide) fan up and outwards and turn sideways in a band below a fixed canopy height, so the trees meet in a flat canopy
+- main branches start on the roof and on the facades and are long enough to reach the canopy and spread along it; side branches (thinner) get more frequent towards the canopy (at most two levels deep, at most 14 growing tips per tower)
+- springs keep the edges of the new wood near their rest length, repulsion (spatial hash) keeps the outlines apart, a little random jitter makes them rugged
 - detail gets finer towards the branch ends, so they taper into points
 - windows are laid out in the original towers; each corner remembers the wall points to its left and right on its floor, so the windows bend and skew with the walls; windows torn apart by a branch or stretched too far disappear
 - growth bursts right after the start and eases off; grown wood hardens after 1.5 s and stops moving, the simulation stops once all tips are done
 
 Nodes are never removed, only inserted, so a node index is a stable attachment point that moves with the growth.
 
+## Parallax skyline
+A second, static city (`ParallaxCity`) without growth, in three layers: far towers showing at the top of the screen (faintest), the middle layer filling most of it (the cables hang from its facades and sky bridges, the pod climbs in it) and near rooftops along the bottom (strongest, drawn in front of the pod). The cables have the intensity of the middle layer and no mounts. The view follows the pod sideways: the middle layer stays in place, the far layer shifts slightly with the pod, the near one against it.
+
+The cities are interchangeable: both implement `City` (`include/city.h`), pick one with `cityType` in `include/sim_loop.h` (`CityType::PARALLAX` or `CityType::GROWING`).
+
 ## Details
 
 ### Vines
-The vines are chains of particles simulated with position based dynamics (30 substeps per frame, distance constraints between neighbours, a soft bending constraint over two segments). They hang from 40 random nodes of the middle and near buildings (some of them growing branch tips), which are particles with infinite mass. While the city grows, the anchors follow their nodes (interpolated over the substeps), and cables between two anchors that move apart pay out rope instead of tearing. The cables settle without bending at the start, so no loops get locked in.
+The vines are chains of particles simulated with position based dynamics (30 substeps per frame, distance constraints between neighbours, a soft bending constraint over two segments). They hang from 40 random nodes of the middle and near buildings (some of them growing branch tips), which are particles with infinite mass. While the city grows, the anchors follow their nodes (interpolated over the substeps), and cables whose ends move apart pay out rope instead of tearing. In 2D the bending keeps a rope from unwinding a loop, so the cables settle without bending at the start, and a cable found crossing itself bends freely for a second.
 
 ### Pod and arms
 The pod is a rigid body (position, orientation) with 40 kg. Each arm consists of two links which telescope together; inverse kinematics (law of cosines, like the double pendulum robot arm) places the elbow away from the pod, the telescope keeps the elbow at a comfortable bend. Every arm can apply a limited force between its shoulder and the hook; the reaction force acts on the vine, so the pod's weight pulls the vines down. When an arm is stretched to its limit a stiff mechanical stop engages.

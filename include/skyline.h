@@ -15,6 +15,7 @@ struct GrowthNode {
   double rest;      // rest length of its edges, fixed when created
   int born;         // growth step it was created in (hardens later)
   bool tip = false; // a branch grew out of it (dragged far away)
+  Vec2 home;        // original position (building nodes)
 };
 
 // point on an edge of the original outline (moves with the deformation)
@@ -40,7 +41,11 @@ struct GrowthTip {
   Vec2 heading;  // growth direction
   double budget; // length still to grow [m]
   int depth;     // 0 main branch, 1 side branch, ...
+  int cap;       // outline nodes on each side moving with the tip
+  double width;  // half width of the branch at its start [m]
+  double length; // total length to grow [m]
   int stuck = 0; // steps without progress
+  int lastKink = 1; // direction of the last kink (+1 left, -1 right)
 };
 
 struct Building {
@@ -48,6 +53,8 @@ struct Building {
   double cx;             // center line
   double base;           // ground level
   double height;         // original height
+  // smooth warp of the upper tower: sway along the height, flaring out
+  double swayAmp, swayFreq, swayPhase, flare;
   int maxNodes;          // safety limit for the growth
   std::vector<GrowthTip> tips;
   std::vector<Window> windows;
@@ -75,19 +82,25 @@ public:
   const std::vector<Building> &getBuildings() const { return buildings; }
 
   static inline const int layers = 3;
+  static inline const int styles = 5;
+
+  // corners of a futuristic tower (style, center, width, height, base)
+  static std::vector<Vec2> outline(int, double, double, double, double);
 
 private:
-  std::vector<Vec2> outline(int, double, double, double, double);
   void addBuilding(const std::vector<Vec2> &, double, double, double, int);
   double growthMask(const Building &, const Vec2 &) const;
   Vec2 growthDir(const Building &, const Vec2 &) const;
   Vec2 outwardNormal(const Building &, int) const;
   double growthBoost() const;
   double detailScale(const Building &, const Vec2 &) const;
+  Vec2 morphOffset(const Building &, const Vec2 &) const;
   void seedTips(Building &);
   void moveTips(Building &, double);
   void updateTips(Building &);
   void branch(Building &, const GrowthTip &);
+  bool capFree(const Building &, int, int) const;
+  void addTip(Building &, int, const Vec2 &, double, int, int);
   void addWindows(Building &);
   std::vector<std::pair<EdgePoint, double>> crossings(const Building &,
                                                       double) const;
@@ -127,24 +140,41 @@ private:
   const double kRepel = 0.5;
   const double jitter = 0.16;    // random roughness per step [m]
   const double roughFloor = 0.7; // share of the jitter after the burst
-  const double taper = 0.6;      // finer detail at branch ends
+  const double taper = 0.3;      // finer detail at branch ends
   const double crownDepth = 70;  // m above the tower to full taper
   const double maxStep = 0.4;
   const double growthStart = -30; // world height where the growth begins
   const double growthRamp = 30;   // m above it to full growth
-  // branches (dead trees: long limbs, few side branches, sharp kinks)
+  // branches: fanning up from the towers into a flat canopy (Chasm City)
   const double tipSpeed = 0.06; // m per step at growth boost 1
   const double maxTipStep = 0.5;
-  const double minLimb = 45, maxLimb = 85; // length of main branches [m]
-  const int facadeTips = 3;                // branches per facade side
+  const double canopyHeight = 118; // top of the canopy (world height)
+  const double canopyBand = 30;    // m below it where limbs turn sideways
+  const double canopyTurn = 0.08;  // turn towards sideways per step in the band
+  const double minSpread = 15, maxSpread = 40; // m along the canopy
+  const int facadeTips = 2;                // branches per facade side
   const double roofFan = 0.8;     // angle spread of the roof branches [rad]
   const double spread = 1.8;      // sideways pull of the branches (width)
-  const double branchLength = 15; // m grown per side branch
-  const double kinkLength = 4;    // m grown per kink
-  const double minKink = 0.3, maxKink = 0.8; // kink angle [rad]
-  const double tropism = 0.01; // bending towards the growth direction
+  const double branchLength = 15; // m grown per side branch (at the top,
+                                  // more rarely further down)
+  const double kinkLength = 20;   // m grown per kink (long straight limbs)
+  const double minKink = 0.1, maxKink = 0.3; // kink angle [rad]
+  const double tropism = 0;    // continuous bending (0: straight limbs)
+  const double maxDeviation = 1.05; // max angle to the growth direction [rad]
+  // thick branches: a cap of outline nodes moves with the tip, the stretched
+  // flanks behind it fill with new nodes (the tree adds wood)
+  const double limbShare = 0.22; // main branch width / tower width
+  // morphing of the original building (smooth, the windows follow)
+  const double minSway = 1, maxSway = 4; // m sideways at full growth
+  const double minFlare = 0.25, maxFlare = 0.5; // widening towards the top
+  const double morphTime = 2;     // s until the warp is mostly done
+  const double kHome = 0.2;       // pull towards the warped position
+  const double capStiffness = 0.2; // pull of the cap nodes into shape
+  const double pointiness = 0.6;  // how far the cap sides trail the tip
+  const double endWidth = 0.6;    // width at the end / width at the start
+  const double woodRough = 0.15;  // share of the roughness on new wood
   const int maxDepth = 2;      // branching recursion
-  const int maxTips = 10;      // growing tips per building
+  const int maxTips = 14;      // growing tips per building
   // growth over time: fast burst, then easing off
   const double stepsPerSecond = 180; // nominal (3 steps at 60 fps)
   const double rampTime = 0.4;       // s to reach the burst

@@ -4,11 +4,11 @@
 #pragma once
 #include "UI.h"
 #include "cable_car.h"
+#include "city.h"
 #include "cable_network.h"
 #include "event_checks.h"
 #include "helper_variables.h"
 #include "path_planner.h"
-#include "skyline.h"
 #include "vec2.h"
 
 #ifdef __EMSCRIPTEN__
@@ -34,14 +34,10 @@ struct context {
   double halfHeight = window_height / pixelsPerMeter / 2;
 
   // the city in the background, cables hang from its buildings
-  Skyline skyline;
-  const double skylineScale = 0.15; // world meters per skyline meter
-  std::vector<int> anchorNodes;     // skyline node of every cable anchor
+  // (GROWING: canopy of dead trees, PARALLAX: static skyline in layers)
+  const CityType cityType = CityType::PARALLAX;
+  std::unique_ptr<City> city = makeCity(cityType);
   const int anchorCount = 40;
-  const double growthDelay = 0.5; // s showing the city before it grows
-  const double growthSpeed = 0.9; // growth steps per time step (demo: 3)
-  double growthDue = 0;           // fractional growth steps not yet done
-  double time = 0;
 
   CableNetwork cableNetwork;
   CableCar cableCar;

@@ -35,6 +35,7 @@ struct Cable {
   double shade;   // [0, 1] for drawing variation
   int firstLink;  // its links and bends are stored consecutively
   int firstBend;
+  double bendOff = 0; // s without bending (lets a loop collapse)
 };
 
 // point along a cable: u = segment index + fraction inside the segment
@@ -42,6 +43,13 @@ struct CablePoint {
   int cable = -1;
   double u = 0;
   bool valid() const { return cable >= 0; }
+};
+
+// how the cables are drawn (the city decides, they belong to its layer)
+struct CableStyle {
+  double alpha = 95;       // alpha of the faintest cable
+  double alphaSpread = 45; // added depending on the cable's shade
+  bool mounts = true;      // circles where the cables hang from the city
 };
 
 // vines hanging from the buildings, simulated with position based dynamics
@@ -59,6 +67,7 @@ public:
   void setAnchorTargets(const std::vector<Vec2> &);
   void moveAnchors(double); // 0 ... 1 of the way
   void payOut();            // lengthen cables pulled taut by their anchors
+  void unloop(double);      // find cables crossing themselves, relax them
 
   Vec2 getPoint(const CablePoint &) const;
   Vec2 getVelocity(const CablePoint &) const;
@@ -70,7 +79,7 @@ public:
   void toggleWind() { windOn = !windOn; }
   bool getWindOn() const { return windOn; }
 
-  void draw(UI &);
+  void draw(UI &, const CableStyle &);
 
   static inline const double segmentLength = 0.5; // m
   static inline const double linearDensity = 4.0; // kg/m
@@ -106,6 +115,11 @@ private:
   const double bendStiffness = 0.05; // [0, 1] per iteration
   const double windStrength = 0.6;   // m/s^2
   const double taut = 0.97;          // chord / length that pays out rope
+  const double payOutSlack = 1.15;   // length / chord after paying out
+  const double tiedSlack = 1.03;     // same for vines tied into a cable
+  const double loopCheck = 0.5;      // s between self crossing checks
+  const double unbendTime = 1;       // s without bending for a looped cable
+  double loopTimer = 0;
 };
 
 #endif

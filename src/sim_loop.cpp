@@ -9,18 +9,11 @@ SimLoop::SimLoop() {
 
 // city, cables hanging from it and the pod
 void SimLoop::buildWorld(context *ctx) {
-  ctx->skyline.setWorldScale(ctx->skylineScale);
-  ctx->skyline.generate(ctx->seed, ctx->halfWidth / ctx->skylineScale,
-                        ctx->halfHeight / ctx->skylineScale);
-  ctx->anchorNodes = ctx->skyline.pickAnchors(ctx->anchorCount, 1);
-  std::vector<Vec2> anchors;
-  for (int node : ctx->anchorNodes)
-    anchors.push_back(ctx->skyline.nodePosition(node));
+  ctx->city->generate(ctx->seed, ctx->halfWidth, ctx->halfHeight,
+                      ctx->anchorCount);
   ctx->cableNetwork.generate(ctx->seed, ctx->halfWidth, ctx->halfHeight,
-                             anchors);
+                             ctx->city->getAnchors());
   ctx->cableCar.reset(ctx->cableNetwork, ctx->target);
-  ctx->time = 0;
-  ctx->growthDue = 0;
   ctx->replanTimer = 0;
 }
 SimLoop::~SimLoop() {}
@@ -53,18 +46,10 @@ void SimLoop::update(context *ctx) {
   else
     ctx->cableCar.setTarget(ctx->target);
 
-  // the city grows, the cable anchors move along with it
-  ctx->time += ctx->dt;
-  bool growing = ctx->time > ctx->growthDelay && !ctx->skyline.getSettled();
-  if (growing) {
-    ctx->growthDue += ctx->growthSpeed;
-    for (; ctx->growthDue >= 1; ctx->growthDue -= 1)
-      ctx->skyline.step();
-    std::vector<Vec2> anchors;
-    for (int node : ctx->anchorNodes)
-      anchors.push_back(ctx->skyline.nodePosition(node));
-    ctx->cableNetwork.setAnchorTargets(anchors);
-  }
+  // the city may grow (the cable anchors move along) and follows the pod
+  bool growing = ctx->city->update(ctx->dt, pos);
+  if (growing)
+    ctx->cableNetwork.setAnchorTargets(ctx->city->getAnchors());
 
   // gait planning once per step, physics in substeps
   ctx->cableCar.plan(ctx->cableNetwork, ctx->dt);
@@ -78,6 +63,7 @@ void SimLoop::update(context *ctx) {
   }
   if (growing)
     ctx->cableNetwork.payOut();
+  ctx->cableNetwork.unloop(ctx->dt);
   ctx->cableCar.updateKinematics(ctx->cableNetwork);
 
   // store pod position in trajectory
@@ -93,13 +79,14 @@ void SimLoop::update(context *ctx) {
 void SimLoop::render(context *ctx) {
   ctx->ui.clear(); // clears screen
 
-  ctx->skyline.draw(ctx->ui, false);
-  ctx->cableNetwork.draw(ctx->ui);
+  ctx->city->drawBack(ctx->ui);
+  ctx->cableNetwork.draw(ctx->ui, ctx->city->cableStyle());
   if (ctx->helperVars.getTrajOn())
     ctx->ui.drawTrajectory(ctx->helperVars.getTrajectory(), 200);
   if (ctx->helperVars.getPathOn())
     ctx->pathPlanner.draw(ctx->ui, ctx->helperVars.getDebug());
   ctx->cableCar.draw(ctx->ui, ctx->helperVars.getDebug());
+  ctx->city->drawFront(ctx->ui);
 
   // target crosshair
   Vec2 t = ctx->target;
