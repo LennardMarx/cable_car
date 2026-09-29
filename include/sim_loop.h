@@ -24,20 +24,23 @@ struct context {
   Uint64 lastTicks = 0;
   double accumulator = 0; // unsimulated time [s]
 
+  // initial window size (native), in the web the canvas sets the size
   int window_width = 1200;
   int window_height = 800;
-  double pixelsPerMeter = 20;
-  UI ui{window_width, window_height, pixelsPerMeter};
+  UI ui{window_width, window_height, 20, true};
 
-  // visible world in meters
-  double halfWidth = window_width / pixelsPerMeter / 2;
-  double halfHeight = window_height / pixelsPerMeter / 2;
+  // visible world in meters: at least this much, the rest of the window
+  // shows more (wide screens: wider, phones: taller)
+  const double minViewWidth = 30, minViewHeight = 40;
+  double halfWidth = 30, halfHeight = 20; // set by fitView
+  double resizeTimer = 0;         // s until the world fits a new window size
+  const double resizeDelay = 0.3; // wait for the size to settle
 
   // the city in the background, cables hang from its buildings
   // (GROWING: canopy of dead trees, PARALLAX: static skyline in layers)
   const CityType cityType = CityType::PARALLAX;
   std::unique_ptr<City> city = makeCity(cityType);
-  const int anchorCount = 40;
+  const int anchorCount = 40; // per 60 x 40 m of visible world
 
   CableNetwork cableNetwork;
   CableCar cableCar;
@@ -68,6 +71,7 @@ public:
   static void update(context *); // advance the simulation by one time step
   static void render(context *);
   static void buildWorld(context *); // city, cables and pod for ctx->seed
+  static void fitView(context *);    // scale and world extents for the window
 
 private:
   static void mainloop(void *arg);

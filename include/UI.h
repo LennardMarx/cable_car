@@ -12,12 +12,16 @@
 // world coordinates: meters, origin in the window center, y pointing up
 class UI {
 public:
-  const int sizeX;
-  const int sizeY;
-  const double scale; // pixels per meter
+  int sizeX;
+  int sizeY;
+  double scale; // pixels per meter
 
-  UI(int, int, double);
+  UI(int, int, double, bool = false); // resizable window (canvas in the web)
   ~UI();
+
+  // takes over the size of the resized window, true if it changed
+  bool fitWindow();
+  void setScale(double _scale) { scale = _scale; }
 
   void clear();
   void present();
@@ -48,7 +52,7 @@ public:
   SDL_Window *getWindow();      // pointer to the window
 
 private:
-  void initialize(int sizeX, int sizeY);
+  void initialize(int sizeX, int sizeY, bool);
   SDL_FColor getFColor();
 
 private:

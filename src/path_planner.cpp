@@ -7,6 +7,16 @@
 PathPlanner::PathPlanner() : support(cols * rows, 0) {}
 PathPlanner::~PathPlanner() {}
 
+void PathPlanner::setExtents(double _halfWidth, double _halfHeight) {
+  halfWidth = _halfWidth;
+  halfHeight = _halfHeight;
+  cols = std::max(1, (int)std::ceil(2 * halfWidth / cellSize));
+  rows = std::max(1, (int)std::ceil(2 * halfHeight / cellSize));
+  support.assign(cols * rows, 0);
+  path.clear();
+  progress = 0;
+}
+
 bool PathPlanner::inGrid(int _c, int _r) const {
   return _c >= 0 && _c < cols && _r >= 0 && _r < rows;
 }

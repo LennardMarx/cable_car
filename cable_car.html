@@ -4,7 +4,14 @@
 <head>
   <meta charset="utf-8">
   <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="stylesheet" type="text/css" href="../../css/styles.css">
+  <!-- the canvas fills the page (or iframe), the simulation fits its view to
+       the canvas size; no scrolling or zooming while dragging the target -->
+  <style>
+    html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; }
+    canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+  </style>
 </head>
 
 

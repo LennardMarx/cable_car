@@ -40,8 +40,11 @@ void CableNetwork::generate(unsigned _seed, double _halfWidth,
   if (anchors.empty())
     return;
 
+  double density = 4 * halfWidth * halfHeight / referenceArea;
+  auto scaled = [&](int _count) { return std::max(1, (int)std::round(_count * density)); };
+
   // free hanging vines
-  for (int i = 0; i < hangingCount; ++i) {
+  for (int i = 0; i < scaled(hangingCount); ++i) {
     int a = randomAnchor();
     double maxLength = particles[a].pos.y + halfHeight - 3;
     if (maxLength < 4)
@@ -51,7 +54,7 @@ void CableNetwork::generate(unsigned _seed, double _halfWidth,
 
   // cables draped between two anchors
   int draped = 0;
-  for (int tries = 0; tries < 500 && draped < 18; ++tries) {
+  for (int tries = 0; tries < 500 && draped < scaled(drapedCount); ++tries) {
     int a = randomAnchor(), b = randomAnchor();
     Vec2 d = particles[b].pos - particles[a].pos;
     if (std::abs(d.x) < 4 || std::abs(d.x) > 18 || std::abs(d.y) > 8)
@@ -68,7 +71,7 @@ void CableNetwork::generate(unsigned _seed, double _halfWidth,
 
   // tangles: vines with their lower end knotted into another cable
   int tangles = 0;
-  for (int tries = 0; tries < 500 && tangles < 6; ++tries) {
+  for (int tries = 0; tries < 500 && tangles < scaled(tangleCount); ++tries) {
     const Cable &other = cables[uniformInt(0, cables.size() - 1)];
     if (other.ids.size() < 8)
       continue;

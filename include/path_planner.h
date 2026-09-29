@@ -13,6 +13,7 @@ public:
   PathPlanner();
   ~PathPlanner();
 
+  void setExtents(double, double); // visible world [m]
   void plan(const CableNetwork &, const Vec2 &, const Vec2 &);
   Vec2 getWaypoint(const Vec2 &); // point on the path ahead of the pod
   Vec2 getGoal() const { return goal; }
@@ -31,9 +32,9 @@ private:
 
   // grid over the visible world
   const double cellSize = 1.0;
-  const double halfWidth = 30, halfHeight = 20;
-  const int cols = 2 * halfWidth / cellSize;
-  const int rows = 2 * halfHeight / cellSize;
+  double halfWidth = 30, halfHeight = 20;
+  int cols = 2 * halfWidth / cellSize;
+  int rows = 2 * halfHeight / cellSize;
 
   std::vector<int> support; // distinct vines within reach per cell
   std::vector<Vec2> path;   // smoothed waypoints from start to goal

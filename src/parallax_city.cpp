@@ -42,15 +42,16 @@ std::vector<double> ParallaxCity::crossings(const std::vector<Vec2> &_poly,
 // towers spread over the width the layer can be shifted by, no overlaps
 void ParallaxCity::addTowers(int _layer) {
   double span = halfWidth + std::abs(shift[_layer]) + 2;
-  double slot = 2 * span / counts[_layer];
+  int count = std::max(1, (int)std::round(2 * span / slot[_layer]));
+  double pitch = 2 * span / count;
   double screenHeight = 2 * halfHeight;
   double base = -halfHeight - baseDepth[_layer] * screenHeight;
   double s = detail[_layer];
-  for (int i = 0; i < counts[_layer]; ++i) {
-    double w = uniform(minWidth[_layer], maxWidth[_layer]) * 2 * halfWidth;
+  for (int i = 0; i < count; ++i) {
+    double w = uniform(minWidth[_layer], maxWidth[_layer]);
     double top = -halfHeight + uniform(minTop[_layer], maxTop[_layer]) * screenHeight;
-    double room = std::max(0.0, slot - w - 0.5) / 2;
-    double cx = -span + (i + 0.5) * slot + uniform(-room, room);
+    double room = std::max(0.0, pitch - w - 0.5) / 2;
+    double cx = -span + (i + 0.5) * pitch + uniform(-room, room);
     int style = std::uniform_int_distribution<int>(0, Skyline::styles - 1)(rng);
     // the shapes are made for meters of the growing skyline
     std::vector<Vec2> tower =

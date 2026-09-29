@@ -47,10 +47,10 @@ private:
   double view = 0; // smoothed pod position across the screen, -1 ... 1
 
   // per layer, heights as a share of the screen height from its bottom,
-  // widths as a share of the screen width
-  const int counts[layers] = {11, 7, 6};
-  const double minWidth[layers] = {0.045, 0.09, 0.13};
-  const double maxWidth[layers] = {0.075, 0.13, 0.2};
+  // widths in meters (wider screens show more towers)
+  const double slot[layers] = {6, 9.5, 12.8}; // m of width per tower
+  const double minWidth[layers] = {2.7, 5.4, 7.8};
+  const double maxWidth[layers] = {4.5, 7.8, 12};
   const double minTop[layers] = {0.86, 0.72, 0.12}; // background shows at the
   const double maxTop[layers] = {0.97, 0.84, 0.2}; // top, near at the bottom
   const double baseDepth[layers] = {0, 0, 0.8}; // ground below the screen

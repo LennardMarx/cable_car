@@ -23,7 +23,7 @@ Run with:
 ```
 
 ## Controls
-Mouse - desired pod position
+Mouse / touch - desired pod position
 Arrow keys - move the desired position
 C - toggle controller (pod hangs passively from its grips)
 F - toggle path finding (default off: straight towards the target)
@@ -56,6 +56,9 @@ Nodes are never removed, only inserted, so a node index is a stable attachment p
 A second, static city (`ParallaxCity`) without growth, in three layers: far towers showing at the top of the screen (faintest), the middle layer filling most of it (the cables hang from its facades and sky bridges, the pod climbs in it) and near rooftops along the bottom (strongest, drawn in front of the pod). The cables have the intensity of the middle layer and no mounts. The view follows the pod sideways: the far layer shifts with the pod, the middle layer a bit against it and the near one strongly against it. The cables and the pod are drawn shifted with the middle layer, their physics is unaffected (the mouse maps back into it).
 
 The cities are interchangeable: both implement `City` (`include/city.h`), pick one with `cityType` in `include/sim_loop.h` (`CityType::PARALLAX` or `CityType::GROWING`).
+
+## Screen size
+The canvas fills its page (or iframe), the window is resizable natively. The view shows at least 30 x 40 m, scaled to fit, the rest of the window shows more of the world (wide screens: wider, phones: taller). Towers, cables and anchors scale with the visible area. After a resize the world is rebuilt for the new view once the size has settled (0.3 s).
 
 ## Details
 

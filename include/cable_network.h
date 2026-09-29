@@ -110,7 +110,11 @@ private:
 
   const Vec2 gravity{0, -9.81};
   const double damping = 0.25;       // velocity damping [1/s]
+  // vines per 60 x 40 m of visible world (scaled with its area)
+  const double referenceArea = 60 * 40;
   const int hangingCount = 28;       // free hanging vines
+  const int drapedCount = 18;        // between two anchors
+  const int tangleCount = 6;         // knotted into another cable
   const int iterations = 2;          // constraint iterations per substep
   const double bendStiffness = 0.05; // [0, 1] per iteration
   const double windStrength = 0.6;   // m/s^2

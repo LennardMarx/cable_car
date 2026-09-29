@@ -1,16 +1,28 @@
 #include "../include/sim_loop.h"
 #include <algorithm>
+#include <cmath>
 #include <string>
 
 SimLoop::SimLoop() {
+  fitView(&ctx);
   buildWorld(&ctx);
   ctx.target = ctx.cableCar.getPosition();
 }
 
+void SimLoop::fitView(context *ctx) {
+  double scale = std::min(ctx->ui.sizeX / ctx->minViewWidth,
+                          ctx->ui.sizeY / ctx->minViewHeight);
+  ctx->ui.setScale(scale);
+  ctx->halfWidth = ctx->ui.sizeX / scale / 2;
+  ctx->halfHeight = ctx->ui.sizeY / scale / 2;
+  ctx->pathPlanner.setExtents(ctx->halfWidth, ctx->halfHeight);
+}
+
 // city, cables hanging from it and the pod
 void SimLoop::buildWorld(context *ctx) {
+  double area = 4 * ctx->halfWidth * ctx->halfHeight / (60 * 40);
   ctx->city->generate(ctx->seed, ctx->halfWidth, ctx->halfHeight,
-                      ctx->anchorCount);
+                      std::round(ctx->anchorCount * area));
   ctx->cableNetwork.generate(ctx->seed, ctx->halfWidth, ctx->halfHeight,
                              ctx->city->getAnchors());
   ctx->cableCar.reset(ctx->cableNetwork, ctx->target);
@@ -134,6 +146,18 @@ void SimLoop::mainloop(void *arg) {
   // fixed time steps, independent of the display refresh rate
   double elapsed = (ctx->frameStart - ctx->lastTicks) / 1000.0;
   ctx->lastTicks = ctx->frameStart;
+
+  // window resized: new world for the new view once the size settles
+  if (ctx->ui.fitWindow())
+    ctx->resizeTimer = ctx->resizeDelay;
+  if (ctx->resizeTimer > 0) {
+    ctx->resizeTimer -= elapsed;
+    if (ctx->resizeTimer <= 0) {
+      fitView(ctx);
+      buildWorld(ctx);
+      ctx->helperVars.getTrajectory().clear();
+    }
+  }
   if (ctx->helperVars.getPause()) {
     ctx->accumulator = 0;
   } else {

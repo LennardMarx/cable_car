@@ -1,9 +1,10 @@
 #include "../include/UI.h"
 #include <algorithm>
 
-UI::UI(int sizeX, int sizeY, double _scale)
+UI::UI(int sizeX, int sizeY, double _scale, bool _resizable)
     : sizeX(sizeX), sizeY(sizeY), scale(_scale) {
-  initialize(sizeX, sizeY);
+  initialize(sizeX, sizeY, _resizable);
+  fitWindow(); // in the web the canvas brings its own size
 }
 
 UI::~UI() {
@@ -21,6 +22,16 @@ void UI::clear() {
 }
 
 void UI::present() { SDL_RenderPresent(renderer); }
+
+bool UI::fitWindow() {
+  int w, h;
+  if (!SDL_GetCurrentRenderOutputSize(renderer, &w, &h) || w <= 0 || h <= 0 ||
+      (w == sizeX && h == sizeY))
+    return false;
+  sizeX = w;
+  sizeY = h;
+  return true;
+}
 
 void UI::setDrawColor(uint8_t r, uint8_t g, uint8_t b, uint8_t a) {
   drawColor = {r, g, b, a};
@@ -200,11 +211,12 @@ SDL_Window *UI::getWindow() // pointer to the window
 }
 
 // initializing the UI
-void UI::initialize(int sizeX, int sizeY) {
+void UI::initialize(int sizeX, int sizeY, bool _resizable) {
   SDL_Init(SDL_INIT_VIDEO);
 
   // Create a Window
-  window = SDL_CreateWindow("Lennard Marx", sizeX, sizeY, 0);
+  window = SDL_CreateWindow("Lennard Marx", sizeX, sizeY,
+                            _resizable ? SDL_WINDOW_RESIZABLE : 0);
   renderer = SDL_CreateRenderer(window, nullptr);
   SDL_SetRenderVSync(renderer, 1);
 

@@ -4,6 +4,8 @@ void EventChecks::checkEvents(HelperVars &_helperVars, CableCar &_cableCar,
                               CableNetwork &_cableNetwork, UI &_ui,
                               Vec2 &_target) {
   while (SDL_PollEvent(&event)) {
+    // window -> renderer pixels (differ with display scaling)
+    SDL_ConvertEventToRenderCoordinates(_ui.getRenderer(), &event);
     switch (event.type) {
     case SDL_EVENT_QUIT:
       _helperVars.toggleQuit();
