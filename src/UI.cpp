@@ -36,12 +36,13 @@ SDL_FColor UI::getFColor() {
 
 // world (meters, y up) -> screen (pixels, y down)
 SDL_FPoint UI::toScreen(const Vec2 &_p) {
-  return {(float)(sizeX / 2 + _p.x * scale), (float)(sizeY / 2 - _p.y * scale)};
+  return {(float)(sizeX / 2 + (_p.x + offset.x) * scale),
+          (float)(sizeY / 2 - (_p.y + offset.y) * scale)};
 }
 
 // screen -> world
 Vec2 UI::toWorld(double _x, double _y) {
-  return {(_x - sizeX / 2) / scale, -(_y - sizeY / 2) / scale};
+  return Vec2((_x - sizeX / 2) / scale, -(_y - sizeY / 2) / scale) - offset;
 }
 
 // function to draw line between two points

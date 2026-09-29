@@ -78,6 +78,7 @@ void SimLoop::update(context *ctx) {
 
 void SimLoop::render(context *ctx) {
   ctx->ui.clear(); // clears screen
+  ctx->ui.setOffset(ctx->city->viewOffset()); // parallax of the pod's layer
 
   ctx->city->drawBack(ctx->ui);
   ctx->cableNetwork.draw(ctx->ui, ctx->city->cableStyle());

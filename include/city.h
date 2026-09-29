@@ -23,6 +23,8 @@ public:
   virtual void drawBack(UI &) = 0; // behind the cables and the pod
   virtual void drawFront(UI &) {} // in front of them
   virtual CableStyle cableStyle() const { return {}; }
+  // shift of the layer the cables and the pod live in (drawing only)
+  virtual Vec2 viewOffset() const { return {0, 0}; }
 };
 
 enum class CityType {

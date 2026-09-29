@@ -53,7 +53,7 @@ Every building is a closed outline of nodes (counter clockwise). Below the growt
 Nodes are never removed, only inserted, so a node index is a stable attachment point that moves with the growth.
 
 ## Parallax skyline
-A second, static city (`ParallaxCity`) without growth, in three layers: far towers showing at the top of the screen (faintest), the middle layer filling most of it (the cables hang from its facades and sky bridges, the pod climbs in it) and near rooftops along the bottom (strongest, drawn in front of the pod). The cables have the intensity of the middle layer and no mounts. The view follows the pod sideways: the middle layer stays in place, the far layer shifts slightly with the pod, the near one against it.
+A second, static city (`ParallaxCity`) without growth, in three layers: far towers showing at the top of the screen (faintest), the middle layer filling most of it (the cables hang from its facades and sky bridges, the pod climbs in it) and near rooftops along the bottom (strongest, drawn in front of the pod). The cables have the intensity of the middle layer and no mounts. The view follows the pod sideways: the far layer shifts with the pod, the middle layer a bit against it and the near one strongly against it. The cables and the pod are drawn shifted with the middle layer, their physics is unaffected (the mouse maps back into it).
 
 The cities are interchangeable: both implement `City` (`include/city.h`), pick one with `cityType` in `include/sim_loop.h` (`CityType::PARALLAX` or `CityType::GROWING`).
 

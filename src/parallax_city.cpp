@@ -169,14 +169,15 @@ void ParallaxCity::pickAnchors(int _count) {
 bool ParallaxCity::update(double _dt, const Vec2 &_focus) {
   double goal = std::clamp(_focus.x / halfWidth, -1.0, 1.0);
   view += (goal - view) * (1 - std::exp(-_dt / smoothing));
-  return false; // the middle layer stays in place with its anchors
+  return false; // the anchors stay in place (only drawn shifted)
 }
 
 // translucent like the growing skyline: soft edges from four slightly
 // offset passes, windows as holes (background color) and a few lit ones
 void ParallaxCity::drawLayer(UI &_ui, int _layer) {
   const CityLayer &l = cityLayers[_layer];
-  Vec2 offset(shift[_layer] * view, 0);
+  // relative to the view offset of the middle layer (set in the UI)
+  Vec2 offset((shift[_layer] - shift[1]) * view, 0);
   const double blur = 1.5 / _ui.scale; // 1.5 px offset per pass
   const Vec2 passes[4] = {{-blur, -blur}, {blur, -blur}, {-blur, blur},
                           {blur, blur}};

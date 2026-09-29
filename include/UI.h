@@ -26,6 +26,9 @@ public:
 
   SDL_FPoint toScreen(const Vec2 &);
   Vec2 toWorld(double, double);
+  // shift of the view [m]: the world is drawn moved by it (parallax)
+  void setOffset(const Vec2 &_offset) { offset = _offset; }
+  Vec2 getOffset() const { return offset; }
 
   void drawLine(const Vec2 &, const Vec2 &);
   void drawThickLine(const Vec2 &, const Vec2 &, double); // width in pixels
@@ -52,6 +55,7 @@ private:
   SDL_Window *window = nullptr;     // create window pointer
   SDL_Renderer *renderer = nullptr; // create renderer pointer
   SDL_Color drawColor = {249, 245, 215, 255};
+  Vec2 offset;
   std::vector<std::vector<float>> rowCrossings; // reused by scanPolygon
 };
 

@@ -13,8 +13,8 @@ struct CityLayer {
 
 // static skyline in three layers: far towers showing at the top, the middle
 // layer the cables hang from (and the pod moves in), near rooftops at the
-// bottom. The view shifts sideways with the pod (parallax around the middle
-// layer, which stays in place with its cables)
+// bottom. The view shifts sideways with the pod (parallax); the cables and
+// the pod are drawn shifted with the middle layer, their physics is not
 class ParallaxCity : public City {
 public:
   void generate(unsigned, double, double, int) override;
@@ -23,6 +23,7 @@ public:
   void drawBack(UI &) override;
   void drawFront(UI &) override;
   CableStyle cableStyle() const override;
+  Vec2 viewOffset() const override { return {shift[1] * view, 0}; }
 
   static inline const int layers = 3; // 0 far, 1 middle, 2 near
 
@@ -56,8 +57,8 @@ private:
   // detail size: world meters per meter of the tower shapes (far: smaller)
   const double detail[layers] = {0.09, 0.15, 0.28};
   // sideways shift [m] with the pod at the edge of the screen: the far layer
-  // follows it, the near one moves against it, the middle one stays
-  const double shift[layers] = {0.6, 0, -2.4};
+  // follows it, the middle and near ones move against it
+  const double shift[layers] = {1.0, -1.2, -4.5};
   const double smoothing = 0.6; // s time constant of the view
   // intensity: the near layer strongest, the far one faintest
   const double alpha[layers] = {26, 70, 130};
